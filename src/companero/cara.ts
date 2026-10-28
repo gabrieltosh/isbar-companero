@@ -12,6 +12,7 @@ export type Expresion =
   | "triste"
   | "pensativo"
   | "cansado"
+  | "bostezo"
   | "mareado"
   | "preocupado"
   | "hablando"
@@ -177,9 +178,11 @@ export function dibujarCara(p: Pose, c: string): string {
       boca = trazo(`M${M - 1} ${N + 3} L${M + 7} ${N + 1}`, c);
       extra = relleno(`<circle cx="62" cy="10" r="2"/>`, c) + relleno(`<circle cx="69" cy="3" r="3"/>`, c);
       break;
-    case "cansado": {
-      // Párpados a media altura y, cada pocos segundos, un bostezo
-      const b = bostezo(t);
+    case "cansado":
+    case "bostezo": {
+      // Cansado: párpados a media altura y, cada pocos segundos, un bostezo.
+      // Bostezo: uno solo, que abre y cierra a lo largo del gesto
+      const b = p.expresion === "bostezo" ? Math.sin(Math.min(1, p.progreso) * Math.PI) : bostezo(t);
       ojos =
         b > 0.3 ? arcoAbajo(izq, Y + 1, c) + arcoAbajo(der, Y + 1, c) : mediaLuna(izq, Y + 1, c) + mediaLuna(der, Y + 1, c);
       boca =

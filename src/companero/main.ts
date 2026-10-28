@@ -24,6 +24,10 @@ const DISTANCIA_MAREO = 110;
 /** Con el cursor a menos de CERCA_MIN px lo sigue del todo; a partir de CERCA_MAX, nada. */
 const CERCA_MIN = 140;
 const CERCA_MAX = 320;
+/** Teclado activo con el ratón quieto este tiempo = se está escribiendo. */
+const ESCRIBIENDO_MS = 2500;
+/** Este tiempo sin usar el PC termina la sesión (el cansancio por llevar mucho rato vuelve a cero). */
+const FIN_SESION_MS = 5 * 60_000;
 
 interface PosGuardada {
   x: number;
@@ -46,6 +50,10 @@ let encima = false;
 let arrastrando = false;
 let inactivo = 0;
 let cursor = { x: 0, y: 0 };
+/** Última vez que se movió el cursor (para saber si se está escribiendo) */
+let ultimoMovimiento = 0;
+/** Desde cuándo se usa el PC sin parar (se reinicia tras un rato sin tocarlo) */
+let sesionDesde = performance.now();
 // Hacia dónde mira cuando está solo (cambia de vez en cuando)
 let miradaLibre = { x: 0, y: 0 };
 let cambioMirada = 0;
@@ -68,6 +76,9 @@ function fotograma(ahora: number): void {
     encima,
     arrastrando,
     inactivo,
+    // Hay actividad (teclado) pero el ratón lleva un rato quieto
+    escribiendo: inactivo < ESCRIBIENDO_MS && ahora - ultimoMovimiento > ESCRIBIENDO_MS,
+    sesion: ahora - sesionDesde,
     noche,
     tranquilo: config.tranquilo,
     peticion: null,
@@ -103,6 +114,10 @@ function fotograma(ahora: number): void {
       cambioMirada = ahora + 1400 + Math.random() * 1600;
     }
     ({ x: miraX, y: miraY } = miradaLibre);
+  } else if (libre && rutina === "teclado") {
+    // Mira hacia abajo, como si leyera lo que escribes
+    miraX = Math.sin(ahora / 350) * 2;
+    miraY = 3.5;
   }
   pose.miraX = acercar(pose.miraX, miraX, 0.15);
   pose.miraY = acercar(pose.miraY, miraY, 0.15);
@@ -155,8 +170,8 @@ function fotograma(ahora: number): void {
     const k = Math.sin(((ahora % 5300) / 5300) * Math.PI);
     estiraY = 1 + k * 0.1;
     estiraX = 1 - k * 0.05;
-  } else if (expresion === "cansado") {
-    const b = bostezo(ahora);
+  } else if (expresion === "cansado" || expresion === "bostezo") {
+    const b = expresion === "bostezo" ? Math.sin(progreso * Math.PI) : bostezo(ahora);
     estiraY = 1 + b * 0.08;
     estiraX = 1 - b * 0.04;
   } else if (expresion === "saludo") {
@@ -259,6 +274,7 @@ listen<[number, number]>("companero-cursor", ({ payload }) => {
   const [x, y] = payload;
   const dx = x - cursor.x;
   cursor = { x, y };
+  ultimoMovimiento = performance.now();
   if (arrastrando || Math.hypot(x - centro(), y - centro()) > DISTANCIA_MAREO * config.tamano) return;
   const direccion = Math.sign(dx);
   if (direccion !== 0 && direccion !== direccionX) {
@@ -275,6 +291,8 @@ listen<[number, number]>("companero-cursor", ({ payload }) => {
 
 listen<number>("companero-inactivo", ({ payload }) => {
   inactivo = payload;
+  // Tras un buen rato sin usar el PC, la sesión vuelve a empezar
+  if (payload > FIN_SESION_MS) sesionDesde = performance.now();
 }).catch(console.error);
 
 // ---------- Ajustes ----------

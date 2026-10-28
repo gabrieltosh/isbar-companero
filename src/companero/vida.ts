@@ -1,6 +1,9 @@
 // Vida propia del compañero: decide qué cara pone en cada momento.
 // Prioridad: un gesto pasajero (guiño, risa…) > lo que pasa ahora (lo arrastras, el ratón encima)
-// > lo que pide la app (música, avisos; fases siguientes) > cómo está él (rutinas, cansancio, sueño).
+// > lo que pide la app (música, avisos; fases siguientes) > cómo está él.
+// Tiene vida siempre: mientras usas el PC tiene ocurrencias de vez en cuando (mira alrededor,
+// silba, se estira, piensa, bosteza si llevas mucho rato) y mira hacia abajo cuando escribes;
+// cuando lo dejas solo hace sus rutinas, se cansa y se duerme.
 import type { Expresion } from "./cara";
 
 /** Tiempo sin usar el PC a partir del cual hace cosas solo, se cansa y se duerme. */
@@ -11,8 +14,14 @@ const DORMIDO_DESDE = 6 * 60_000;
 const FACTOR_NOCHE = 0.5;
 /** Cada cuánto elige una rutina nueva cuando está solo. */
 const DURACION_RUTINA = 8_000;
+/** Mientras usas el PC: cada cuánto tiene una ocurrencia (entre mín. y máx.) y cuánto dura. */
+const OCURRENCIA_CADA: [number, number] = [25_000, 60_000];
+const OCURRENCIA_CADA_TRANQUILO: [number, number] = [60_000, 120_000];
+const DURACION_OCURRENCIA = 4_500;
+/** Usando el PC sin parar este tiempo, empieza a bostezar de vez en cuando. */
+const SESION_LARGA = 50 * 60_000;
 
-export type Rutina = "mira" | "silba" | "estira" | null;
+export type Rutina = "mira" | "silba" | "estira" | "teclado" | null;
 
 export interface Contexto {
   ahora: number;
@@ -21,6 +30,10 @@ export interface Contexto {
   arrastrando: boolean;
   /** Tiempo sin tocar el ratón ni el teclado, en ms */
   inactivo: number;
+  /** Se está escribiendo (hay actividad pero el ratón está quieto) */
+  escribiendo: boolean;
+  /** Cuánto tiempo seguido lleva usándose el PC, en ms */
+  sesion: number;
   noche: boolean;
   /** Modo tranquilo: sin rutinas llamativas */
   tranquilo: boolean;
@@ -31,11 +44,20 @@ export interface Contexto {
 export interface Decision {
   expresion: Expresion;
   rutina: Rutina;
-  /** Progreso (0 a 1) del gesto pasajero, si lo hay */
+  /** Progreso (0 a 1) del gesto u ocurrencia en curso, si lo hay */
   progreso: number;
 }
 
-let pasajero: { expresion: Expresion; desde: number; hasta: number } | null = null;
+interface Momento {
+  expresion: Expresion;
+  rutina: Rutina;
+  desde: number;
+  hasta: number;
+}
+
+let pasajero: Momento | null = null;
+let ocurrencia: Momento | null = null;
+let proximaOcurrencia = performance.now() + 15_000;
 let rutina: Rutina = null;
 let cambioRutina = 0;
 let estabaDormido = false;
@@ -43,7 +65,7 @@ let estabaDormido = false;
 /** Un gesto que dura un momento (guiño, risa, enfado…) y tapa todo lo demás. */
 export function gesto(expresion: Expresion, ms: number): void {
   const ahora = performance.now();
-  pasajero = { expresion, desde: ahora, hasta: ahora + ms };
+  pasajero = { expresion, rutina: null, desde: ahora, hasta: ahora + ms };
 }
 
 export function hayGesto(): boolean {
@@ -56,6 +78,9 @@ export function esDeNoche(fecha = new Date()): boolean {
   return h >= 22 || h < 6;
 }
 
+const azar = <T>(opciones: T[]): T => opciones[Math.floor(Math.random() * opciones.length)];
+const progresoDe = (m: Momento, ahora: number) => Math.min(1, (ahora - m.desde) / (m.hasta - m.desde));
+
 function elegirRutina(tranquilo: boolean): Rutina {
   const r = Math.random();
   if (tranquilo) return r < 0.5 ? null : "mira";
@@ -63,6 +88,23 @@ function elegirRutina(tranquilo: boolean): Rutina {
   if (r < 0.4) return "mira";
   if (r < 0.7) return "silba";
   return "estira";
+}
+
+/** Una ocurrencia mientras usas el PC. Si llevas mucho rato (o es de noche), a veces bosteza. */
+function elegirOcurrencia(ctx: Contexto): Momento {
+  const cansado = ctx.sesion > SESION_LARGA || ctx.noche;
+  type Opcion = [Expresion, Rutina];
+  const opciones: Opcion[] = ctx.tranquilo
+    ? [["normal", "mira"], ["pensativo", null]]
+    : [["normal", "mira"], ["silba", "silba"], ["normal", "estira"], ["pensativo", null]];
+  if (cansado) opciones.push(["bostezo", null], ["bostezo", null]);
+  const [expresion, r] = azar(opciones);
+  return { expresion, rutina: r, desde: ctx.ahora, hasta: ctx.ahora + DURACION_OCURRENCIA };
+}
+
+function programarOcurrencia(ahora: number, tranquilo: boolean): void {
+  const [min, max] = tranquilo ? OCURRENCIA_CADA_TRANQUILO : OCURRENCIA_CADA;
+  proximaOcurrencia = ahora + min + Math.random() * (max - min);
 }
 
 export function decidir(ctx: Contexto): Decision {
@@ -73,8 +115,7 @@ export function decidir(ctx: Contexto): Decision {
   estabaDormido = dormido;
 
   if (pasajero && ctx.ahora < pasajero.hasta) {
-    const progreso = (ctx.ahora - pasajero.desde) / (pasajero.hasta - pasajero.desde);
-    return { expresion: pasajero.expresion, rutina: null, progreso };
+    return { expresion: pasajero.expresion, rutina: null, progreso: progresoDe(pasajero, ctx.ahora) };
   }
   pasajero = null;
 
@@ -82,10 +123,11 @@ export function decidir(ctx: Contexto): Decision {
   if (ctx.encima) return { expresion: "feliz", rutina: null, progreso: 0 };
   if (ctx.peticion) return { expresion: ctx.peticion, rutina: null, progreso: 0 };
 
+  // Lo dejaste solo: se duerme, se cansa o hace sus rutinas
   if (dormido) return { expresion: "dormido", rutina: null, progreso: 0 };
   if (ctx.inactivo > CANSADO_DESDE * factor) return { expresion: "cansado", rutina: null, progreso: 0 };
-
   if (ctx.inactivo > RUTINAS_DESDE) {
+    ocurrencia = null;
     if (ctx.ahora > cambioRutina) {
       rutina = elegirRutina(ctx.tranquilo);
       cambioRutina = ctx.ahora + DURACION_RUTINA;
@@ -93,5 +135,18 @@ export function decidir(ctx: Contexto): Decision {
     return { expresion: rutina === "silba" ? "silba" : "normal", rutina, progreso: 0 };
   }
   rutina = null;
-  return { expresion: "normal", rutina: null, progreso: 0 };
+
+  // Estás usando el PC: de vez en cuando tiene una ocurrencia
+  if (ocurrencia && ctx.ahora < ocurrencia.hasta) {
+    return { expresion: ocurrencia.expresion, rutina: ocurrencia.rutina, progreso: progresoDe(ocurrencia, ctx.ahora) };
+  }
+  ocurrencia = null;
+  if (ctx.ahora > proximaOcurrencia) {
+    ocurrencia = elegirOcurrencia(ctx);
+    programarOcurrencia(ctx.ahora, ctx.tranquilo);
+    return { expresion: ocurrencia.expresion, rutina: ocurrencia.rutina, progreso: 0 };
+  }
+
+  // Mientras escribes, mira hacia abajo como si leyera lo que escribes
+  return { expresion: "normal", rutina: ctx.escribiendo ? "teclado" : null, progreso: 0 };
 }
