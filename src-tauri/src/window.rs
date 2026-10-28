@@ -88,7 +88,8 @@ fn cursor_en(app: &AppHandle, ventana: &WebviewWindow) -> Option<(f64, f64)> {
 pub fn iniciar_click_through(app: AppHandle) {
     thread::spawn(move || {
         let mut dentro_antes: Option<bool> = None;
-        let mut cursor_antes = (f64::NAN, f64::NAN);
+        // Sin posición anterior: la primera siempre se envía
+        let mut cursor_antes: Option<(f64, f64)> = None;
         loop {
             thread::sleep(Duration::from_millis(30));
             let estado = app.state::<Estado>();
@@ -116,9 +117,10 @@ pub fn iniciar_click_through(app: AppHandle) {
                     Err(e) => eprintln!("click-through: {e}"),
                 }
             }
-            if (x - cursor_antes.0).abs() > 2.0 || (y - cursor_antes.1).abs() > 2.0 {
+            let se_movio = cursor_antes.is_none_or(|(ax, ay)| (x - ax).abs() > 2.0 || (y - ay).abs() > 2.0);
+            if se_movio {
                 let _ = ventana.emit("companero-cursor", (x, y));
-                cursor_antes = (x, y);
+                cursor_antes = Some((x, y));
             }
         }
     });
