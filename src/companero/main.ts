@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { COMPANERO_POR_DEFECTO, EVENTO_AJUSTES, type ConfigCompanero } from "../ajustes";
 import { guardar, leer } from "../store";
 import { $ } from "../util";
-import { bostezo, dibujarCara, type Pose } from "./cara";
+import { bostezo, dibujarCara, type Expresion, type Pose } from "./cara";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -14,6 +14,8 @@ const LADO = 64;
 /** Mantenerlo pulsado este tiempo empieza el arrastre (un clic corto no). */
 const RETARDO_ARRASTRE = 230;
 const DURACION_GUINO = 1100;
+/** Fundido entre una cara y la siguiente. */
+const DURACION_TRANSICION = 300;
 /** Clics seguidos: dos rápidos = risa; cuatro en poco tiempo = se enoja. */
 const DOBLE_CLIC_MS = 320;
 const RAFAGA_MS = 1500;
@@ -63,6 +65,8 @@ let escalaY = 1;
 // Se inclina un poco hacia el cursor cuando está cerca
 const inclinacion = { x: 0, y: 0 };
 const pose: Pose = { expresion: "normal", miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0, t: 0, progreso: 0 };
+// Al cambiar de cara, la anterior se desvanece mientras aparece la nueva
+let transicion: { desde: Expresion; progreso: number; inicio: number } | null = null;
 
 const acercar = (a: number, b: number, k: number) => a + (b - a) * k;
 const centro = () => (MARGEN + LADO / 2) * config.tamano;
@@ -83,6 +87,12 @@ function fotograma(ahora: number): void {
     tranquilo: config.tranquilo,
     peticion: null,
   });
+  if (expresion !== pose.expresion) {
+    transicion = { desde: pose.expresion, progreso: pose.progreso, inicio: ahora };
+    // Un pequeño aplastamiento del cuerpo, como si reaccionara
+    escalaX = Math.max(escalaX, 1.04);
+    escalaY = Math.min(escalaY, 0.96);
+  }
   pose.expresion = expresion;
   pose.t = ahora;
   pose.progreso = progreso;
@@ -186,8 +196,26 @@ function fotograma(ahora: number): void {
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
-  cara.innerHTML = dibujarCara(pose, config.color);
+  cara.innerHTML = dibujarConTransicion(ahora);
   requestAnimationFrame(fotograma);
+}
+
+/** La cara actual; durante un cambio, fundido con la anterior y la nueva entrando con un "pop". */
+function dibujarConTransicion(ahora: number): string {
+  const nueva = dibujarCara(pose, config.color);
+  if (!transicion) return nueva;
+  const k = Math.min(1, (ahora - transicion.inicio) / DURACION_TRANSICION);
+  if (k >= 1) {
+    transicion = null;
+    return nueva;
+  }
+  const e = 1 - Math.pow(1 - k, 3);
+  const vieja = dibujarCara({ ...pose, expresion: transicion.desde, progreso: transicion.progreso }, config.color);
+  const escala = (0.9 + 0.1 * e).toFixed(3);
+  return (
+    `<g opacity="${(1 - e).toFixed(3)}">${vieja}</g>` +
+    `<g opacity="${e.toFixed(3)}" transform="translate(32 32) scale(${escala}) translate(-32 -32)">${nueva}</g>`
+  );
 }
 
 /** Parpadea de vez en cuando, a intervalos irregulares (más despacio en modo tranquilo). */
