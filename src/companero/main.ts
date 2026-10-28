@@ -5,7 +5,16 @@ import { listen } from "@tauri-apps/api/event";
 import { COMPANERO_POR_DEFECTO, EVENTO_AJUSTES, type ConfigCompanero } from "../ajustes";
 import { guardar, leer } from "../store";
 import { $ } from "../util";
-import { bostezo, dibujarCara, type Expresion, type Pose } from "./cara";
+import {
+  bostezo,
+  dibujarCara,
+  dibujarExtras,
+  mezclar,
+  rasgosDe,
+  type Expresion,
+  type Pose,
+  type Rasgos,
+} from "./cara";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -14,8 +23,8 @@ const LADO = 64;
 /** Mantenerlo pulsado este tiempo empieza el arrastre (un clic corto no). */
 const RETARDO_ARRASTRE = 230;
 const DURACION_GUINO = 1100;
-/** Fundido entre una cara y la siguiente. */
-const DURACION_TRANSICION = 300;
+/** Lo que tarda una cara en transformarse en la siguiente (morph). */
+const DURACION_MORPH = 380;
 /** Clics seguidos: dos rápidos = risa; cuatro en poco tiempo = se enoja. */
 const DOBLE_CLIC_MS = 320;
 const RAFAGA_MS = 1500;
@@ -64,9 +73,13 @@ let escalaX = 1;
 let escalaY = 1;
 // Se inclina un poco hacia el cursor cuando está cerca
 const inclinacion = { x: 0, y: 0 };
-const pose: Pose = { expresion: "normal", miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0, t: 0, progreso: 0 };
-// Al cambiar de cara, la anterior se desvanece mientras aparece la nueva
-let transicion: { desde: Expresion; progreso: number; inicio: number } | null = null;
+const pose: Pose = { miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0 };
+let expresionActual: Expresion = "normal";
+let progresoActual = 0;
+// Morph: al cambiar de cara, los rasgos van de los que se veían a los de la cara nueva.
+// Los extras (notas, espirales, "z"…) de la cara anterior se desvanecen mientras tanto
+let rasgosVistos: Rasgos = rasgosDe("normal", 0, 0);
+let morph: { desde: Rasgos; extras: Expresion; progresoExtras: number; inicio: number } | null = null;
 
 const acercar = (a: number, b: number, k: number) => a + (b - a) * k;
 const centro = () => (MARGEN + LADO / 2) * config.tamano;
@@ -87,15 +100,15 @@ function fotograma(ahora: number): void {
     tranquilo: config.tranquilo,
     peticion: null,
   });
-  if (expresion !== pose.expresion) {
-    transicion = { desde: pose.expresion, progreso: pose.progreso, inicio: ahora };
+  if (expresion !== expresionActual) {
+    // Empieza desde lo que se ve ahora (aunque estuviera a mitad de otro cambio)
+    morph = { desde: rasgosVistos, extras: expresionActual, progresoExtras: progresoActual, inicio: ahora };
     // Un pequeño aplastamiento del cuerpo, como si reaccionara
-    escalaX = Math.max(escalaX, 1.04);
-    escalaY = Math.min(escalaY, 0.96);
+    escalaX = Math.max(escalaX, 1.03);
+    escalaY = Math.min(escalaY, 0.97);
   }
-  pose.expresion = expresion;
-  pose.t = ahora;
-  pose.progreso = progreso;
+  expresionActual = expresion;
+  progresoActual = progreso;
 
   // Mirada: escondido en un borde, hacia dentro; con el cursor cerca, lo sigue (ojos, cabeza
   // y se inclina un poco hacia él); solo, mira a su alrededor
@@ -196,25 +209,31 @@ function fotograma(ahora: number): void {
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
-  cara.innerHTML = dibujarConTransicion(ahora);
+  cara.innerHTML = dibujarConMorph(ahora);
   requestAnimationFrame(fotograma);
 }
 
-/** La cara actual; durante un cambio, fundido con la anterior y la nueva entrando con un "pop". */
-function dibujarConTransicion(ahora: number): string {
-  const nueva = dibujarCara(pose, config.color);
-  if (!transicion) return nueva;
-  const k = Math.min(1, (ahora - transicion.inicio) / DURACION_TRANSICION);
-  if (k >= 1) {
-    transicion = null;
-    return nueva;
+/** Curva de aceleración suave al empezar y al terminar. */
+const suavizar = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+/** La cara actual: durante un cambio, los rasgos se transforman y los extras se funden. */
+function dibujarConMorph(ahora: number): string {
+  const c = config.color;
+  const objetivo = rasgosDe(expresionActual, ahora, progresoActual);
+  const extrasNuevos = dibujarExtras(expresionActual, ahora, progresoActual, pose, c);
+  if (!morph) {
+    rasgosVistos = objetivo;
+    return dibujarCara(objetivo, pose, c) + extrasNuevos;
   }
-  const e = 1 - Math.pow(1 - k, 3);
-  const vieja = dibujarCara({ ...pose, expresion: transicion.desde, progreso: transicion.progreso }, config.color);
-  const escala = (0.9 + 0.1 * e).toFixed(3);
+  const k = Math.min(1, (ahora - morph.inicio) / DURACION_MORPH);
+  const e = suavizar(k);
+  rasgosVistos = mezclar(morph.desde, objetivo, e);
+  const extrasViejos = dibujarExtras(morph.extras, ahora, morph.progresoExtras, pose, c);
+  if (k >= 1) morph = null;
   return (
-    `<g opacity="${(1 - e).toFixed(3)}">${vieja}</g>` +
-    `<g opacity="${e.toFixed(3)}" transform="translate(32 32) scale(${escala}) translate(-32 -32)">${nueva}</g>`
+    dibujarCara(rasgosVistos, pose, c) +
+    (extrasViejos ? `<g opacity="${(1 - e).toFixed(3)}">${extrasViejos}</g>` : "") +
+    (extrasNuevos ? `<g opacity="${e.toFixed(3)}">${extrasNuevos}</g>` : "")
   );
 }
 

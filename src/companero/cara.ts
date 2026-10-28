@@ -1,6 +1,10 @@
 // Cara LED del compañero: ojos y boca con trazos gruesos y un brillo suave alrededor.
-// Se dibuja en SVG (64×64) a partir de una expresión, hacia dónde mira y el tiempo
-// (para lo que se mueve solo: cantar, marearse, respirar dormido…).
+//
+// Los ojos y la boca siempre tienen la misma forma base (una curva arriba y otra abajo entre
+// dos puntas) y cada expresión es solo una lista de números ("rasgos"). Así se puede pasar de
+// una cara a otra transformando los rasgos poco a poco (morph): el ojo redondo se curva hasta
+// ser un "^", la sonrisa se abre... Lo que no se puede transformar (espirales, notas, "z",
+// estrellas…) son "extras" que aparecen y desaparecen con un fundido.
 
 export type Expresion =
   | "normal"
@@ -20,69 +24,83 @@ export type Expresion =
   | "dormido"
   | "celebra"
   | "saludo"
-  | "musica";
+  | "musica"
+  | "notificacion";
 
+/** Un ojo: ancho, altura de la curva de arriba y de abajo (negativa = sube: "^"), giro y posición. */
+export interface Ojo {
+  w: number;
+  t: number;
+  b: number;
+  giro: number;
+  dx: number;
+  dy: number;
+}
+
+/** La boca: ancho, curva del borde de arriba y del de abajo (positivo = hacia abajo), giro y posición. */
+export interface Boca {
+  w: number;
+  t: number;
+  b: number;
+  giro: number;
+  dx: number;
+  dy: number;
+}
+
+export interface Rasgos {
+  izq: Ojo;
+  der: Ojo;
+  boca: Boca;
+}
+
+/** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
 export interface Pose {
-  expresion: Expresion;
   /** Desplazamiento de la mirada, en px (aprox. ±4) */
   miraX: number;
   miraY: number;
-  /** 0 = ojos abiertos, 1 = cerrados (parpadeo) */
+  /** 0 = ojos abiertos, 1 = cerrados */
   parpadeo: number;
   /** Inclinación de la cabeza, en grados */
   giro: number;
   /** Rebote vertical, en px */
   salto: number;
-  /** Tiempo en ms (animaciones que se repiten) */
-  t: number;
-  /** Progreso (0 a 1) de las animaciones de una sola vez, como el guiño */
-  progreso: number;
 }
+
+/** Centros de los ojos y de la boca en la cara (64×64). */
+const OJO_IZQ = { x: 21, y: 25 };
+const OJO_DER = { x: 43, y: 25 };
+const BOCA = { x: 32, y: 42 };
+/** Constante para aproximar un cuarto de elipse con una curva de Bézier. */
+const K = 0.5523;
 
 const suave = (p: number) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
 const limitar = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const n = (v: number) => v.toFixed(2);
 
-/** Trazo con brillo: una línea ancha y tenue debajo de la línea principal. */
-function trazo(d: string, c: string, ancho = 4): string {
-  return `<path d="${d}" stroke="${c}" stroke-opacity=".2" stroke-width="${ancho + 5}" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" stroke="${c}" stroke-width="${ancho}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+const ojo = (w: number, t: number, b: number, giro = 0, dx = 0, dy = 0): Ojo => ({ w, t, b, giro, dx, dy });
+const boca = (w: number, t: number, b: number, giro = 0, dx = 0, dy = 0): Boca => ({ w, t, b, giro, dx, dy });
+const iguales = (o: Ojo, boca: Boca): Rasgos => ({ izq: o, der: { ...o, giro: -o.giro, dx: -o.dx }, boca });
+
+// Formas que se repiten
+const OJO_NORMAL = ojo(9.2, 4.6, 4.6);
+const OJO_FELIZ = ojo(12, 4.5, -2.2);
+const OJO_GRANDE = ojo(11.6, 5.8, 5.8);
+const OJO_CERRADO = ojo(10, 0.6, 0.6, 0, 0, 1);
+const SONRISA = boca(16, 6, 6);
+const SONRISA_ABIERTA = boca(22, 0, 12);
+
+function mezclarObj<T extends object>(a: T, b: T, k: number): T {
+  const r = { ...a } as Record<string, number>;
+  const ra = a as Record<string, number>;
+  const rb = b as Record<string, number>;
+  for (const c of Object.keys(ra)) r[c] = ra[c] + (rb[c] - ra[c]) * k;
+  return r as T;
 }
 
-/** Forma rellena con brillo. */
-function relleno(forma: string, c: string): string {
-  return forma.replace("/>", ` fill="${c}" stroke="${c}" stroke-opacity=".2" stroke-width="6"/>`);
+/** Rasgos intermedios entre dos caras (k de 0 a 1). */
+export function mezclar(a: Rasgos, b: Rasgos, k: number): Rasgos {
+  return { izq: mezclarObj(a.izq, b.izq, k), der: mezclarObj(a.der, b.der, k), boca: mezclarObj(a.boca, b.boca, k) };
 }
-
-const ojo = (x: number, y: number, r: number, c: string, alto = 1) =>
-  relleno(`<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${Math.max(0.6, r * alto)}"/>`, c);
-/** Ojo contento "^" */
-const arcoArriba = (x: number, y: number, c: string) => trazo(`M${x - 6} ${y + 3} Q${x} ${y - 5} ${x + 6} ${y + 3}`, c);
-/** Ojo apretado hacia abajo (bostezo) */
-const arcoAbajo = (x: number, y: number, c: string) => trazo(`M${x - 6} ${y - 1} Q${x} ${y + 4} ${x + 6} ${y - 1}`, c);
-const linea = (x: number, y: number, c: string) => trazo(`M${x - 5} ${y} L${x + 5} ${y}`, c);
-/** Ojo con el párpado a la mitad (media luna) */
-const mediaLuna = (x: number, y: number, c: string) =>
-  relleno(`<path d="M${x - 5.5} ${y - 1} L${x + 5.5} ${y - 1} A5.5 5.5 0 0 1 ${x - 5.5} ${y - 1} Z"/>`, c);
-const sonrisaAbierta = (m: number, n: number, c: string) =>
-  relleno(`<path d="M${m - 11} ${n - 1} L${m + 11} ${n - 1} Q${m + 11} ${n + 12} ${m} ${n + 12} Q${m - 11} ${n + 12} ${m - 11} ${n - 1} Z"/>`, c);
-const sonrisa = (m: number, n: number, c: string) => trazo(`M${m - 8} ${n} Q${m} ${n + 7} ${m + 8} ${n}`, c);
-
-function espiral(x: number, y: number, giro: number, c: string): string {
-  let d = "";
-  for (let i = 0; i <= 20; i++) {
-    const a = giro + i * 0.55;
-    const r = 0.4 + i * 0.27;
-    d += `${i ? "L" : "M"}${(x + Math.cos(a) * r).toFixed(1)} ${(y + Math.sin(a) * r).toFixed(1)}`;
-  }
-  return `<path d="${d}" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
-}
-
-/** Estrella de cuatro puntas (guiño y celebración). */
-const estrella = (x: number, y: number, s: number, c: string) =>
-  `<path d="M${x} ${y - 6 * s} Q${x + 1.2 * s} ${y - 1.2 * s} ${x + 6 * s} ${y} Q${x + 1.2 * s} ${y + 1.2 * s} ${x} ${y + 6 * s} Q${x - 1.2 * s} ${y + 1.2 * s} ${x - 6 * s} ${y} Q${x - 1.2 * s} ${y - 1.2 * s} ${x} ${y - 6 * s} Z" fill="${c}"/>`;
-
-/** Notita musical que sube y se desvanece (k de 0 a 1). */
-const nota = (x: number, y: number, k: number, c: string) =>
-  `<g opacity="${(1 - k).toFixed(2)}" transform="translate(${(x + k * 10).toFixed(1)} ${(y - k * 26).toFixed(1)})"><path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" fill="none"/><circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
 
 /** Cuánto está bostezando (0 a 1), en un ciclo de unos 9 s. */
 export function bostezo(t: number): number {
@@ -90,144 +108,172 @@ export function bostezo(t: number): number {
   return c > 150 && c < 230 ? Math.sin(((c - 150) / 80) * Math.PI) : 0;
 }
 
-export function dibujarCara(p: Pose, c: string): string {
-  const X = 32 + p.miraX;
-  const Y = 25 + p.miraY + p.salto;
-  const M = 32 + p.miraX * 0.4;
-  const N = 41 + p.miraY * 0.4 + p.salto;
-  const izq = X - 11;
-  const der = X + 11;
-  const abierto = 1 - p.parpadeo * 0.8;
-  const t = p.t;
-  let ojos = "";
-  let boca = "";
-  let extra = "";
+/** Ojos medio cerrados de cansancio; al bostezar (b de 0 a 1) se aprietan y la boca se abre. */
+function cansancio(bo: number): Rasgos {
+  const o = mezclarObj(ojo(11, 0.6, 4.4, 0, 0, 1), ojo(12, 0.3, 1.4, 0, 0, 1), bo);
+  const abierta = 2 + bo * 6;
+  return iguales(o, boca(6 + bo * 6, -abierta * 0.6 * bo, Math.max(0.5, abierta * bo), 0, 0, 3 * bo));
+}
 
-  switch (p.expresion) {
+/** Los rasgos de cada expresión. `t` (ms) mueve lo que se repite; `progreso` (0 a 1), los gestos de una vez. */
+export function rasgosDe(expresion: Expresion, t: number, progreso: number): Rasgos {
+  switch (expresion) {
     case "feliz":
     case "saludo":
-      ojos = arcoArriba(izq, Y, c) + arcoArriba(der, Y, c);
-      boca = sonrisaAbierta(M, N, c);
-      if (p.expresion === "saludo") {
-        // Una manita que saluda a un lado
-        const a = Math.sin(t / 45) * 25;
-        extra = `<g transform="translate(66 34) rotate(${a.toFixed(1)})"><path d="M0 0 L0 -12" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/><circle cx="0" cy="-14" r="3.4" fill="${c}"/></g>`;
-      }
-      break;
+      return iguales(OJO_FELIZ, SONRISA_ABIERTA);
     case "risa":
     case "celebra":
-      ojos =
-        trazo(`M${izq - 5} ${Y - 4} L${izq + 4} ${Y} L${izq - 5} ${Y + 4}`, c) +
-        trazo(`M${der + 5} ${Y - 4} L${der - 4} ${Y} L${der + 5} ${Y + 4}`, c);
-      boca = sonrisaAbierta(M, N, c);
-      if (p.expresion === "celebra") {
-        for (let i = 0; i < 5; i++) {
-          const a = t / 400 + i * 1.256;
-          const r = 40 + Math.sin(t / 160 + i) * 3;
-          extra += estrella(32 + Math.cos(a) * r, 32 + Math.sin(a) * r, 0.6, c);
-        }
-      }
-      break;
-    case "guino": {
-      // Cierra un ojo poco a poco, sonrisa pícara y una estrellita que sube
-      const g = p.progreso;
-      const cierre = g < 0.15 ? suave(g / 0.15) : g < 0.62 ? 1 : 1 - suave(Math.min(1, (g - 0.62) / 0.2));
-      const alto = 1 - cierre;
-      ojos =
-        ojo(izq, Y - cierre * 0.6, 4.6 + cierre * 0.4, c) +
-        (alto > 0.25 ? ojo(der, Y, 4.6, c, alto) : trazo(`M${der - 6} ${Y + 1} Q${der} ${Y - 5} ${der + 6} ${Y + 1}`, c));
-      boca = trazo(`M${M - 8} ${N + 1 - cierre} Q${M + 1 + cierre * 2} ${N + 7 + cierre} ${M + 8 + cierre} ${N - 2 - cierre * 3}`, c);
-      if (g > 0.12 && g < 0.75) {
-        const q = (g - 0.12) / 0.63;
-        extra = estrella(der + 15 + q * 4, Y - 10 - q * 6, Math.sin(q * Math.PI) * 0.9, c);
-      }
-      break;
-    }
+      // Ojos apretados de risa, un poco girados hacia dentro
+      return iguales(ojo(11, 2.6, -2.6, 12), boca(22, 0, 13));
     case "sorpresa":
-      ojos = ojo(izq, Y, 5.8, c, abierto) + ojo(der, Y, 5.8, c, abierto);
-      boca = relleno(`<ellipse cx="${M}" cy="${N + 4}" rx="5" ry="6"/>`, c);
-      break;
+      return iguales(OJO_GRANDE, boca(10, -6, 7, 0, 0, 1));
+    case "notificacion":
+      return iguales(OJO_GRANDE, boca(7.2, -4.4, 4.4, 0, 0, 1));
     case "enojado":
-      ojos =
-        trazo(`M${izq - 6} ${Y - 6} L${izq + 5} ${Y - 2}`, c) +
-        trazo(`M${der + 6} ${Y - 6} L${der - 5} ${Y - 2}`, c) +
-        ojo(izq, Y + 3, 3.6, c, abierto) +
-        ojo(der, Y + 3, 3.6, c, abierto);
-      boca = trazo(`M${M - 7} ${N + 5} Q${M} ${N} ${M + 7} ${N + 5}`, c);
-      break;
+      // Párpado de arriba cortado y caído hacia dentro
+      return iguales(ojo(9, 1.6, 4, 20, 0, 2), boca(14, -4, -4, 0, 0, 3));
     case "triste":
-    case "preocupado":
-      ojos =
-        trazo(`M${izq - 6} ${Y - 2} L${izq + 5} ${Y - 6}`, c) +
-        trazo(`M${der + 6} ${Y - 2} L${der - 5} ${Y - 6}`, c) +
-        ojo(izq, Y + 3, 3.6, c, abierto) +
-        ojo(der, Y + 3, 3.6, c, abierto);
-      if (p.expresion === "triste") {
-        boca = trazo(`M${M - 7} ${N + 5} Q${M} ${N - 1} ${M + 7} ${N + 5}`, c);
-      } else {
-        // Boca temblorosa y una gota de sudor que cae
-        let d = `M${M - 8} ${N + 3}`;
-        for (let i = 1; i <= 4; i++) d += ` Q${M - 8 + i * 4 - 2} ${N + 3 + (i % 2 ? -3 : 3)} ${M - 8 + i * 4} ${N + 3}`;
-        boca = trazo(d, c, 3.2);
-        const k = (t % 1600) / 1600;
-        extra = `<path d="M53 ${(12 + k * 8).toFixed(1)}c2.2 3 3.4 4.5 3.4 6a3.4 3.4 0 0 1-6.8 0c0-1.5 1.2-3 3.4-6z" fill="#7FB8FF" opacity="${(1 - k * 0.6).toFixed(2)}"/>`;
-      }
-      break;
-    case "pensativo":
-      ojos = ojo(izq + 3, Y - 3, 4.2, c, abierto) + ojo(der + 3, Y - 3, 4.2, c, abierto);
-      boca = trazo(`M${M - 1} ${N + 3} L${M + 7} ${N + 1}`, c);
-      extra = relleno(`<circle cx="62" cy="10" r="2"/>`, c) + relleno(`<circle cx="69" cy="3" r="3"/>`, c);
-      break;
-    case "cansado":
-    case "bostezo": {
-      // Cansado: párpados a media altura y, cada pocos segundos, un bostezo.
-      // Bostezo: uno solo, que abre y cierra a lo largo del gesto
-      const b = p.expresion === "bostezo" ? Math.sin(Math.min(1, p.progreso) * Math.PI) : bostezo(t);
-      ojos =
-        b > 0.3 ? arcoAbajo(izq, Y + 1, c) + arcoAbajo(der, Y + 1, c) : mediaLuna(izq, Y + 1, c) + mediaLuna(der, Y + 1, c);
-      boca =
-        b > 0.05
-          ? relleno(`<ellipse cx="${M}" cy="${N + 4}" rx="${(3 + b * 3).toFixed(2)}" ry="${(2 + b * 6).toFixed(2)}"/>`, c)
-          : trazo(`M${M - 5} ${N + 3} L${M + 5} ${N + 3}`, c);
-      break;
+      return iguales(ojo(9, 1.6, 4, -18, 0, 2), boca(14, -5, -5, 0, 0, 3));
+    case "preocupado": {
+      const tiembla = Math.sin(t / 70) * 1.2;
+      return iguales(ojo(9, 1.8, 4, -16, 0, 2), boca(15, -1.5 + tiembla, -1.5 - tiembla, 0, 0, 3));
     }
+    case "pensativo":
+      return iguales(ojo(8.4, 4.2, 4.2, 0, 3, -3), boca(8, -1, -1, -14, 3, 3));
+    case "cansado":
+      return cansancio(bostezo(t));
+    case "bostezo":
+      return cansancio(Math.sin(limitar(progreso, 0, 1) * Math.PI));
     case "mareado": {
-      ojos = espiral(izq, Y, t / 65, c) + espiral(der, Y, t / 65, c);
-      let d = `M${M - 9} ${N + 3}`;
-      for (let i = 1; i <= 6; i++) d += ` L${M - 9 + i * 3} ${(N + 3 + (i % 2 ? -2.5 : 2.5) * Math.cos(t / 80)).toFixed(1)}`;
-      boca = trazo(d, c);
-      break;
+      // Los ojos se hacen pequeños (encima van las espirales) y la boca ondula
+      const onda = 2.5 * Math.cos(t / 80);
+      return iguales(ojo(3, 1.5, 1.5), boca(18, onda, onda, 0, 0, 3));
     }
     case "hablando": {
-      ojos = ojo(izq, Y, 4.6, c, abierto) + ojo(der, Y, 4.6, c, abierto);
       const a = 1.5 + Math.abs(Math.sin(t / 48)) * 3.5;
-      boca = relleno(`<ellipse cx="${M}" cy="${N + 3}" rx="4.5" ry="${a.toFixed(2)}"/>`, c);
-      break;
+      return iguales(OJO_NORMAL, boca(9, -a, a, 0, 0, 3));
     }
     case "musica": {
-      // Ojos contentos y canta: la boca se abre al ritmo y salen notitas
-      ojos = arcoArriba(izq, Y, c) + arcoArriba(der, Y, c);
       const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
-      boca = relleno(`<ellipse cx="${M}" cy="${N + 3}" rx="5" ry="${a.toFixed(2)}"/>`, c);
-      extra = nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
-      break;
+      return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
     }
     case "silba":
-      ojos = ojo(izq, Y - 1, 4.2, c, abierto) + ojo(der, Y - 1, 4.2, c, abierto);
-      boca = relleno(`<circle cx="${M + 2}" cy="${N + 3}" r="2.6"/>`, c);
-      extra = nota(58, 30, (t % 2000) / 2000, c);
-      break;
+      return iguales(ojo(8.4, 4.2, 4.2, 0, 0, -1), boca(5.2, -2.6, 2.6, 0, 2, 3));
     case "dormido": {
-      ojos = linea(izq, Y + 1, c) + linea(der, Y + 1, c);
       const r = 1.5 + Math.abs(Math.sin(t / 400)) * 1.5;
-      boca = relleno(`<circle cx="${M}" cy="${N + 2}" r="${r.toFixed(2)}"/>`, c);
-      const k = (t % 1800) / 1800;
-      extra = `<text x="56" y="${(6 - k * 15).toFixed(1)}" fill="${c}" opacity="${(1 - k).toFixed(2)}" font-size="12" font-family="Segoe UI, sans-serif">z</text>`;
-      break;
+      return iguales(OJO_CERRADO, boca(r * 2, -r, r, 0, 0, 2));
+    }
+    case "guino": {
+      // Un ojo se cierra poco a poco en "^" y la boca hace una sonrisa pícara torcida
+      const g = progreso;
+      const c = g < 0.15 ? suave(g / 0.15) : g < 0.62 ? 1 : 1 - suave(Math.min(1, (g - 0.62) / 0.2));
+      return {
+        izq: ojo(9.2 + c * 0.8, 4.6 + c * 0.4, 4.6 + c * 0.4, 0, 0, -c * 0.6),
+        der: mezclarObj(OJO_NORMAL, ojo(12, 3.5, -2.4, -6), c),
+        boca: boca(16 + c, 6 + c, 6 + c, -12 * c, c, -c),
+      };
     }
     default:
-      ojos = ojo(izq, Y, 4.6, c, abierto) + ojo(der, Y, 4.6, c, abierto);
-      boca = sonrisa(M, N, c);
+      return iguales(OJO_NORMAL, SONRISA);
   }
-  return `${extra}<g transform="rotate(${limitar(p.giro, -80, 80).toFixed(2)} 32 32)">${ojos}${boca}</g>`;
+}
+
+/** Contorno de dos curvas entre (-w/2, 0) y (w/2, 0): la de arriba pasa por (0, arriba) y la de abajo por (0, abajo). */
+function contorno(w: number, arriba: number, abajo: number): string {
+  const a = w / 2;
+  return (
+    `M${n(-a)} 0` +
+    `C${n(-a)} ${n(arriba * K)} ${n(-a * K)} ${n(arriba)} 0 ${n(arriba)}` +
+    `C${n(a * K)} ${n(arriba)} ${n(a)} ${n(arriba * K)} ${n(a)} 0` +
+    `C${n(a)} ${n(abajo * K)} ${n(a * K)} ${n(abajo)} 0 ${n(abajo)}` +
+    `C${n(-a * K)} ${n(abajo)} ${n(-a)} ${n(abajo * K)} ${n(-a)} 0Z`
+  );
+}
+
+/** Forma rellena con trazo grueso y brillo (el trazo hace que una forma plana se vea como una línea). */
+function forma(d: string, x: number, y: number, giro: number, c: string): string {
+  const pieza = `<path d="${d}" fill="${c}" stroke="${c}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const brillo = `<path d="${d}" fill="none" stroke="${c}" stroke-opacity=".2" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>`;
+  return `<g transform="translate(${n(x)} ${n(y)}) rotate(${n(giro)})">${brillo}${pieza}</g>`;
+}
+
+/** Dibuja ojos y boca a partir de los rasgos y la pose. */
+export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
+  const cierre = limitar(p.parpadeo, 0, 1) * 0.9;
+  const parpadear = (o: Ojo): Ojo => ({ ...o, t: o.t + (Math.min(o.t, 0.6) - o.t) * cierre, b: o.b + (Math.min(o.b, 0.6) - o.b) * cierre });
+  const pintarOjo = (o: Ojo, base: { x: number; y: number }) => {
+    const q = parpadear(o);
+    // Las curvas: hacia arriba la de arriba (negativa en SVG), hacia abajo la de abajo
+    return forma(contorno(q.w, -q.t, q.b), base.x + q.dx + p.miraX, base.y + q.dy + p.miraY + p.salto, q.giro, c);
+  };
+  const bo = r.boca;
+  const boca = forma(
+    contorno(bo.w, bo.t, bo.b),
+    BOCA.x + bo.dx + p.miraX * 0.4,
+    BOCA.y + bo.dy + p.miraY * 0.4 + p.salto,
+    bo.giro,
+    c,
+  );
+  return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">${pintarOjo(r.izq, OJO_IZQ)}${pintarOjo(r.der, OJO_DER)}${boca}</g>`;
+}
+
+// ---------- Extras (no se transforman: aparecen y desaparecen con un fundido) ----------
+
+function espiral(x: number, y: number, giro: number, c: string): string {
+  let d = "";
+  for (let i = 0; i <= 20; i++) {
+    const a = giro + i * 0.55;
+    const r = 0.4 + i * 0.27;
+    d += `${i ? "L" : "M"}${n(x + Math.cos(a) * r)} ${n(y + Math.sin(a) * r)}`;
+  }
+  return `<path d="${d}" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+}
+
+const estrella = (x: number, y: number, s: number, c: string) =>
+  `<path d="M${n(x)} ${n(y - 6 * s)} Q${n(x + 1.2 * s)} ${n(y - 1.2 * s)} ${n(x + 6 * s)} ${n(y)} Q${n(x + 1.2 * s)} ${n(y + 1.2 * s)} ${n(x)} ${n(y + 6 * s)} Q${n(x - 1.2 * s)} ${n(y + 1.2 * s)} ${n(x - 6 * s)} ${n(y)} Q${n(x - 1.2 * s)} ${n(y - 1.2 * s)} ${n(x)} ${n(y - 6 * s)} Z" fill="${c}"/>`;
+
+/** Notita musical que sube y se desvanece (k de 0 a 1). */
+const nota = (x: number, y: number, k: number, c: string) =>
+  `<g opacity="${n(1 - k)}" transform="translate(${n(x + k * 10)} ${n(y - k * 26)})"><path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" fill="none"/><circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
+
+/** Lo que acompaña a una expresión y no forma parte de los ojos ni la boca. */
+export function dibujarExtras(expresion: Expresion, t: number, progreso: number, p: Pose, c: string): string {
+  switch (expresion) {
+    case "mareado":
+      return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">${espiral(OJO_IZQ.x + p.miraX, OJO_IZQ.y + p.miraY, t / 65, c)}${espiral(OJO_DER.x + p.miraX, OJO_DER.y + p.miraY, t / 65, c)}</g>`;
+    case "celebra": {
+      let s = "";
+      for (let i = 0; i < 5; i++) {
+        const a = t / 400 + i * 1.256;
+        const r = 40 + Math.sin(t / 160 + i) * 3;
+        s += estrella(32 + Math.cos(a) * r, 32 + Math.sin(a) * r, 0.6, c);
+      }
+      return s;
+    }
+    case "saludo": {
+      const a = Math.sin(t / 45) * 25;
+      return `<g transform="translate(66 34) rotate(${n(a)})"><path d="M0 0 L0 -12" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/><circle cx="0" cy="-14" r="3.4" fill="${c}"/></g>`;
+    }
+    case "guino": {
+      if (progreso <= 0.12 || progreso >= 0.75) return "";
+      const q = (progreso - 0.12) / 0.63;
+      return estrella(OJO_DER.x + p.miraX + 15 + q * 4, OJO_DER.y - 10 - q * 6, Math.sin(q * Math.PI) * 0.9, c);
+    }
+    case "preocupado": {
+      const k = (t % 1600) / 1600;
+      return `<path d="M53 ${n(12 + k * 8)}c2.2 3 3.4 4.5 3.4 6a3.4 3.4 0 0 1-6.8 0c0-1.5 1.2-3 3.4-6z" fill="#7FB8FF" opacity="${n(1 - k * 0.6)}"/>`;
+    }
+    case "pensativo":
+      return `<circle cx="62" cy="10" r="2" fill="${c}"/><circle cx="69" cy="3" r="3" fill="${c}"/>`;
+    case "musica":
+      return nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
+    case "silba":
+      return nota(58, 30, (t % 2000) / 2000, c);
+    case "dormido": {
+      const k = (t % 1800) / 1800;
+      return `<text x="56" y="${n(6 - k * 15)}" fill="${c}" opacity="${n(1 - k)}" font-size="12" font-family="Segoe UI, sans-serif">z</text>`;
+    }
+    default:
+      return "";
+  }
 }
