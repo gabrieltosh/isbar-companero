@@ -21,6 +21,9 @@ const RAFAGA_MS = 1500;
 const GIROS_MAREO = 6;
 const VENTANA_MAREO_MS = 700;
 const DISTANCIA_MAREO = 110;
+/** Con el cursor a menos de CERCA_MIN px lo sigue del todo; a partir de CERCA_MAX, nada. */
+const CERCA_MIN = 140;
+const CERCA_MAX = 320;
 
 interface PosGuardada {
   x: number;
@@ -49,6 +52,8 @@ let cambioMirada = 0;
 // El cuerpo se aplasta al soltarlo y vuelve solo
 let escalaX = 1;
 let escalaY = 1;
+// Se inclina un poco hacia el cursor cuando está cerca
+const inclinacion = { x: 0, y: 0 };
 const pose: Pose = { expresion: "normal", miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0, t: 0, progreso: 0 };
 
 const acercar = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -71,32 +76,42 @@ function fotograma(ahora: number): void {
   pose.t = ahora;
   pose.progreso = progreso;
 
-  // Mirada: escondido en un borde, hacia dentro; solo, a su alrededor; si no, al cursor
+  // Mirada: escondido en un borde, hacia dentro; con el cursor cerca, lo sigue (ojos, cabeza
+  // y se inclina un poco hacia él); solo, mira a su alrededor
   let miraX = 0;
   let miraY = 0;
+  let inclinaX = 0;
+  let inclinaY = 0;
+  let giroCursor = 0;
   const libre = expresion === "normal" || expresion === "silba" || expresion === "sorpresa";
+  const vx = cursor.x - centro();
+  const vy = cursor.y - centro();
+  const d = Math.hypot(vx, vy) || 1;
+  // 1 con el cursor cerca del compañero; baja a 0 al alejarse
+  const cerca = Math.max(0, Math.min(1, (CERCA_MAX - d / config.tamano) / (CERCA_MAX - CERCA_MIN)));
   if (borde !== 0) {
     miraX = -borde * 3.5;
+  } else if (libre && cerca > 0) {
+    miraX = (vx / d) * 4 * cerca;
+    miraY = (vy / d) * 3.5 * cerca;
+    giroCursor = (vx / d) * 7 * cerca;
+    inclinaX = (vx / d) * 3 * cerca;
+    inclinaY = (vy / d) * 2 * cerca;
   } else if (libre && rutina === "mira") {
     if (ahora > cambioMirada) {
       miradaLibre = { x: (Math.random() * 2 - 1) * 3.5, y: (Math.random() * 2 - 1) * 2.5 };
       cambioMirada = ahora + 1400 + Math.random() * 1600;
     }
     ({ x: miraX, y: miraY } = miradaLibre);
-  } else if (libre) {
-    const vx = cursor.x - centro();
-    const vy = cursor.y - centro();
-    const d = Math.hypot(vx, vy) || 1;
-    const f = Math.min(1, d / 170);
-    miraX = (vx / d) * 3.5 * f;
-    miraY = (vy / d) * 3 * f;
   }
   pose.miraX = acercar(pose.miraX, miraX, 0.15);
   pose.miraY = acercar(pose.miraY, miraY, 0.15);
+  inclinacion.x = acercar(inclinacion.x, inclinaX, 0.12);
+  inclinacion.y = acercar(inclinacion.y, inclinaY, 0.12);
 
   // Cabeza y saltitos según el gesto (en modo tranquilo, más suaves)
   const movimiento = config.tranquilo ? 0.5 : 1;
-  let giro = -borde * 12;
+  let giro = -borde * 12 + giroCursor;
   let salto = 0;
   switch (expresion) {
     case "guino":
@@ -152,7 +167,7 @@ function fotograma(ahora: number): void {
   const agarre = arrastrando ? 1.12 : 1;
   const sx = respira * agarre * escalaX * estiraX;
   const sy = respira * agarre * escalaY * estiraY;
-  companero.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
+  companero.style.transform = `translate(${inclinacion.x.toFixed(2)}px, ${inclinacion.y.toFixed(2)}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 

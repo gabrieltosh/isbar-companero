@@ -11,24 +11,7 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "label": "main",
-        "title": "Isla",
-        "width": 560,
-        "height": 290,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "shadow": false,
-        "resizable": false,
-        "maximizable": false,
-        "minimizable": false,
-        "skipTaskbar": true,
-        "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

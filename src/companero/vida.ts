@@ -59,9 +59,9 @@ export function esDeNoche(fecha = new Date()): boolean {
 function elegirRutina(tranquilo: boolean): Rutina {
   const r = Math.random();
   if (tranquilo) return r < 0.5 ? null : "mira";
-  if (r < 0.35) return null;
-  if (r < 0.55) return "mira";
-  if (r < 0.8) return "silba";
+  if (r < 0.15) return null;
+  if (r < 0.4) return "mira";
+  if (r < 0.7) return "silba";
   return "estira";
 }
 

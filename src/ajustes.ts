@@ -1,46 +1,6 @@
-// Ajustes compartidos entre la isla y la ventana de configuración.
+// Ajustes compartidos entre el compañero y la ventana de configuración.
 // Se guardan en el store; quien los cambia emite EVENTO_AJUSTES para que los demás los relean.
-import { leer } from "./store";
-
 export const EVENTO_AJUSTES = "ajustes-cambiados";
-
-/** Vistas de la isla, en el orden por defecto. */
-export const NOMBRES_VISTAS: Record<string, string> = {
-  media: "Música",
-  pomodoro: "Pomodoro",
-  agua: "Agua",
-  bandeja: "Bandeja",
-  tareas: "Tareas",
-  calendario: "Calendario",
-  claude: "Claude",
-  pausas: "Pausas activas",
-};
-
-/** Cómo se muestra isbar: la isla arriba o el compañero que se mueve por la pantalla. */
-export type Estilo = "isla" | "companero";
-
-export interface Ajustes {
-  estilo: Estilo;
-  /** Orden de las vistas (ids); también el de los iconos de la barra de abajo */
-  vistas: string[];
-  /** Vistas desactivadas */
-  ocultas: string[];
-  /** Tamaño de la isla (1 = 100 %) */
-  escala: number;
-  /** Separación del borde superior, en px */
-  desplazamiento: number;
-  /** Nombre del monitor, o null para el principal */
-  monitor: string | null;
-}
-
-export const AJUSTES_POR_DEFECTO: Ajustes = {
-  estilo: "isla",
-  vistas: Object.keys(NOMBRES_VISTAS),
-  ocultas: [],
-  escala: 1,
-  desplazamiento: 0,
-  monitor: null,
-};
 
 export interface ConfigPomodoro {
   enfoque: number; // minutos
@@ -107,20 +67,3 @@ export interface ConfigSonido {
 }
 
 export const SONIDO_POR_DEFECTO: ConfigSonido = { activo: true, volumen: 0.6 };
-
-/** Lee los ajustes y completa lo que falte (p. ej. vistas nuevas). */
-export async function leerAjustes(): Promise<Ajustes> {
-  const a = { ...AJUSTES_POR_DEFECTO, ...(await leer<Partial<Ajustes>>("ajustes", {})) };
-  const conocidas = Object.keys(NOMBRES_VISTAS);
-  const vistas = a.vistas.filter((id) => conocidas.includes(id));
-  for (const id of conocidas) if (!vistas.includes(id)) vistas.push(id);
-  // Se descartan campos de versiones anteriores (p. ej. los iconos de la cabecera)
-  return {
-    estilo: a.estilo === "companero" ? "companero" : "isla",
-    vistas,
-    ocultas: a.ocultas.filter((id) => conocidas.includes(id)),
-    escala: a.escala,
-    desplazamiento: a.desplazamiento,
-    monitor: a.monitor,
-  };
-}

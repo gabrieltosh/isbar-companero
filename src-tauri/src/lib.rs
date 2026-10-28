@@ -11,7 +11,6 @@ mod media;
 #[cfg(target_os = "windows")]
 mod notifications;
 
-use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,14 +19,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
-        .manage(window::EstadoIsla::default());
+        .manage(window::Estado::default());
 
     #[cfg(target_os = "windows")]
     let builder = builder.invoke_handler(tauri::generate_handler![
-        window::set_island_rect,
-        window::aplicar_ajustes_ventana,
-        window::listar_monitores,
-        window::aplicar_estilo,
         companero::iniciar_companero,
         companero::set_companero_rects,
         companero::arrastrar_companero,
@@ -50,10 +45,6 @@ pub fn run() {
     ]);
     #[cfg(not(target_os = "windows"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
-        window::set_island_rect,
-        window::aplicar_ajustes_ventana,
-        window::listar_monitores,
-        window::aplicar_estilo,
         companero::iniciar_companero,
         companero::set_companero_rects,
         companero::arrastrar_companero,
@@ -67,10 +58,8 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            if let Some(ventana) = app.get_webview_window("main") {
-                window::colocar(&ventana, &window::AjustesVentana::default())?;
-                ventana.set_ignore_cursor_events(true)?;
-            }
+            // La única ventana es la del compañero; su página la coloca y la muestra
+            companero::crear(app.handle())?;
             tray::crear(app.handle())?;
             window::iniciar_click_through(app.handle().clone());
             claude_uso::iniciar(app.handle().clone());
@@ -83,5 +72,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error al iniciar la isla");
+        .expect("error al iniciar el compañero");
 }

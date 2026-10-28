@@ -1,5 +1,5 @@
 // Estado del Pomodoro, sin interfaz: lo usan la isla y el compañero.
-// Solo una ventana debe llamar a iniciar() (la del estilo activo), para no duplicar el temporizador.
+// Solo la ventana del compañero debe llamar a iniciar(), para no duplicar el temporizador.
 import { listen } from "@tauri-apps/api/event";
 import { EVENTO_AJUSTES, POMODORO_POR_DEFECTO, type ConfigPomodoro } from "../ajustes";
 import { guardar, leer } from "../store";

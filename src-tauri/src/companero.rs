@@ -18,7 +18,7 @@ use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 
-use crate::window::{aplicar_visibilidad, EstadoIsla, RectIsla};
+use crate::window::{aplicar_visibilidad, Estado, Rect};
 
 pub const ETIQUETA: &str = "companero";
 
@@ -59,7 +59,7 @@ struct Soltado {
     borde: i8,
 }
 
-/// Crea la ventana si no existe. Nace fuera de la pantalla y oculta para Windows (pero visible
+/// Crea la ventana (al arrancar). Nace fuera de la pantalla y oculta para Windows (pero visible
 /// para Tauri, ver window::fijar_visible); se muestra cuando el frontend la coloca.
 pub fn crear(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(ventana) = app.get_webview_window(ETIQUETA) {
@@ -93,9 +93,7 @@ fn iniciar_inactividad(app: AppHandle) {
     }
     thread::spawn(move || loop {
         thread::sleep(AVISO_INACTIVIDAD);
-        if app.state::<EstadoIsla>().companero.load(Ordering::SeqCst)
-            && let Some(ventana) = app.get_webview_window(ETIQUETA)
-        {
+        if let Some(ventana) = app.get_webview_window(ETIQUETA) {
             let _ = ventana.emit("companero-inactivo", ms_inactivo());
         }
     });
@@ -185,15 +183,15 @@ pub fn iniciar_companero(app: AppHandle, pos: Option<PosCompanero>) -> Result<i8
     let (x, y) = pos.map(|p| (p.x, p.y)).unwrap_or_else(|| posicion_inicial(&ventana));
     let (x, y, borde) = destino(&ventana, x, y, true);
     ventana.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    app.state::<EstadoIsla>().companero_listo.store(true, Ordering::SeqCst);
+    app.state::<Estado>().listo.store(true, Ordering::SeqCst);
     aplicar_visibilidad(&app);
     Ok(borde)
 }
 
 /// Zonas de la ventana que reciben el ratón (el resto deja pasar los clics).
 #[tauri::command]
-pub fn set_companero_rects(estado: tauri::State<'_, EstadoIsla>, rects: Vec<RectIsla>) {
-    if let Ok(mut actuales) = estado.rects_companero.lock() {
+pub fn set_companero_rects(estado: tauri::State<'_, Estado>, rects: Vec<Rect>) {
+    if let Ok(mut actuales) = estado.rects.lock() {
         *actuales = rects;
     }
 }

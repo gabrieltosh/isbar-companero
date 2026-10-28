@@ -1,6 +1,6 @@
 // Estado de las pausas activas, sin interfaz: cuándo toca estirar la postura o descansar la vista,
 // y la rutina guiada paso a paso (con sus sonidos).
-// Solo una ventana debe llamar a iniciar() (la del estilo activo), para no duplicar los avisos.
+// Solo la ventana del compañero debe llamar a iniciar(), para no duplicar los avisos.
 import { listen } from "@tauri-apps/api/event";
 import { EVENTO_AJUSTES, PAUSAS_POR_DEFECTO, type ConfigPausas } from "../ajustes";
 import { sonarAviso, sonarPaso } from "../sonido";

@@ -6,9 +6,9 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use crate::window::{aplicar_visibilidad, EstadoIsla};
+use crate::window::{aplicar_visibilidad, Estado};
 
-/// Mismos argumentos que la ventana de la isla (tauri.conf.json): todas las ventanas
+/// Mismos argumentos en todas las ventanas: todas
 /// comparten carpeta de datos de WebView2 y deben arrancar con las mismas opciones.
 /// Son los de Tauri por defecto más el permiso para sonar sin un clic previo.
 pub(crate) const ARGS_NAVEGADOR: &str =
@@ -26,7 +26,7 @@ pub fn crear(app: &AppHandle) -> tauri::Result<()> {
         // Clic izquierdo: mostrar/ocultar. Clic derecho: menú
         .show_menu_on_left_click(false)
         .on_menu_event(|app, evento| match evento.id().as_ref() {
-            "alternar" => alternar_isla(app),
+            "alternar" => alternar_visible(app),
             "config" => abrir_configuracion(app),
             "salir" => app.exit(0),
             _ => {}
@@ -38,7 +38,7 @@ pub fn crear(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = evento
             {
-                alternar_isla(bandeja.app_handle());
+                alternar_visible(bandeja.app_handle());
             }
         });
     if let Some(imagen) = app.default_window_icon() {
@@ -48,12 +48,12 @@ pub fn crear(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn alternar_isla(app: &AppHandle) {
-    app.state::<EstadoIsla>().visible_usuario.fetch_xor(true, Ordering::SeqCst);
+fn alternar_visible(app: &AppHandle) {
+    app.state::<Estado>().visible_usuario.fetch_xor(true, Ordering::SeqCst);
     aplicar_visibilidad(app);
 }
 
-/// Botón de engranaje de la isla. Es async porque crear una ventana desde un
+/// Abre la configuración desde la página. Es async porque crear una ventana desde un
 /// comando síncrono bloquea el hilo principal en Windows.
 #[tauri::command]
 pub async fn abrir_configuracion_cmd(app: AppHandle) {
@@ -69,7 +69,7 @@ pub fn abrir_configuracion(app: &AppHandle) {
         return;
     }
     let resultado = WebviewWindowBuilder::new(app, "config", WebviewUrl::App("config.html".into()))
-        .title("Configuración de Isla")
+        .title("Configuración de isbar Compañero")
         .inner_size(440.0, 660.0)
         .resizable(false)
         .maximizable(false)

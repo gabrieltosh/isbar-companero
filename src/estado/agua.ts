@@ -1,5 +1,5 @@
 // Estado del agua, sin interfaz: litros de hoy, meta y recordatorio periódico.
-// Solo una ventana debe llamar a iniciar() (la del estilo activo), para no duplicar el recordatorio.
+// Solo la ventana del compañero debe llamar a iniciar(), para no duplicar el recordatorio.
 import { listen } from "@tauri-apps/api/event";
 import { AGUA_POR_DEFECTO, EVENTO_AJUSTES, type ConfigAgua } from "../ajustes";
 import { sonarAviso } from "../sonido";

@@ -1,4 +1,4 @@
-// Ventana de configuración: cada cambio se guarda al momento y se avisa a la isla.
+// Ventana de configuración: cada cambio se guarda al momento y se avisa al compañero.
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import {
@@ -6,14 +6,10 @@ import {
   COLORES_COMPANERO,
   COMPANERO_POR_DEFECTO,
   EVENTO_AJUSTES,
-  NOMBRES_VISTAS,
   PAUSAS_POR_DEFECTO,
   POMODORO_POR_DEFECTO,
   SONIDO_POR_DEFECTO,
   TAMANOS_COMPANERO,
-  leerAjustes,
-  type Ajustes,
-  type Estilo,
   type ConfigAgua,
   type ConfigCompanero,
   type ConfigPausas,
@@ -24,21 +20,14 @@ import { campanita } from "./sonido";
 import { guardar, leer } from "./store";
 import { $, escapar } from "./util";
 
-interface InfoMonitor {
-  nombre: string;
-  etiqueta: string;
-}
-
 // Cada grupo de campos se guarda bajo su clave del store
 const grupos: {
-  ajustes: Ajustes;
   pomodoro: ConfigPomodoro;
   agua: ConfigAgua;
   pausas: ConfigPausas;
   sonido: ConfigSonido;
   companero: ConfigCompanero;
 } = {
-  ajustes: await leerAjustes(),
   pomodoro: await leer("pomodoroConfig", POMODORO_POR_DEFECTO),
   agua: await leer("aguaConfig", AGUA_POR_DEFECTO),
   pausas: { ...PAUSAS_POR_DEFECTO, ...(await leer<Partial<ConfigPausas>>("pausasConfig", {})) },
@@ -46,7 +35,6 @@ const grupos: {
   companero: { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) },
 };
 const CLAVES: Record<keyof typeof grupos, string> = {
-  ajustes: "ajustes",
   pomodoro: "pomodoroConfig",
   agua: "aguaConfig",
   pausas: "pausasConfig",
@@ -59,58 +47,9 @@ async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
   await emit(EVENTO_AJUSTES);
 }
 
-// ---------- Vistas ----------
-
-const listaVistas = $(document, "#vistas");
-
-function pintarVistas(): void {
-  const { vistas, ocultas } = grupos.ajustes;
-  listaVistas.innerHTML = vistas
-    .map(
-      (id, i) => `<li data-id="${id}">
-        <label><input type="checkbox" ${ocultas.includes(id) ? "" : "checked"} /> ${escapar(NOMBRES_VISTAS[id] ?? id)}</label>
-        <button data-mover="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
-        <button data-mover="1" ${i === vistas.length - 1 ? "disabled" : ""} aria-label="Bajar">↓</button>
-      </li>`,
-    )
-    .join("");
-}
-
-listaVistas.addEventListener("change", (e) => {
-  const id = (e.target as HTMLElement).closest<HTMLElement>("[data-id]")?.dataset.id;
-  if (!id) return;
-  const { vistas, ocultas } = grupos.ajustes;
-  const ocultar = !ocultas.includes(id);
-  // Siempre tiene que quedar al menos una vista activa
-  if (ocultar && ocultas.length >= vistas.length - 1) {
-    pintarVistas();
-    return;
-  }
-  grupos.ajustes.ocultas = ocultar ? [...ocultas, id] : ocultas.filter((o) => o !== id);
-  void guardarGrupo("ajustes");
-});
-
-listaVistas.addEventListener("click", (e) => {
-  const boton = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mover]");
-  const id = boton?.closest<HTMLElement>("[data-id]")?.dataset.id;
-  if (!boton || !id) return;
-  const vistas = [...grupos.ajustes.vistas];
-  const desde = vistas.indexOf(id);
-  const hasta = desde + Number(boton.dataset.mover);
-  if (hasta < 0 || hasta >= vistas.length) return;
-  [vistas[desde], vistas[hasta]] = [vistas[hasta], vistas[desde]];
-  grupos.ajustes.vistas = vistas;
-  pintarVistas();
-  void guardarGrupo("ajustes");
-});
-
-pintarVistas();
-
 // ---------- Campos numéricos, rangos e interruptores ----------
 
 function pintarValores(): void {
-  $(document, "#v-escala").textContent = `${Math.round(grupos.ajustes.escala * 100)} %`;
-  $(document, "#v-desplazamiento").textContent = `${grupos.ajustes.desplazamiento} px`;
   $(document, "#v-volumen").textContent = `${Math.round(grupos.sonido.volumen * 100)} %`;
 }
 
@@ -164,28 +103,6 @@ selectorCompanero("#companero-color", COLORES_COMPANERO, grupos.companero.color,
 });
 selectorCompanero("#companero-tamano", TAMANOS_COMPANERO, String(grupos.companero.tamano), (v) => {
   grupos.companero.tamano = Number(v);
-});
-
-// ---------- Estilo ----------
-
-const selectorEstilo = $<HTMLSelectElement>(document, "#estilo");
-selectorEstilo.value = grupos.ajustes.estilo;
-selectorEstilo.addEventListener("change", () => {
-  grupos.ajustes.estilo = selectorEstilo.value as Estilo;
-  void guardarGrupo("ajustes");
-});
-
-// ---------- Monitor ----------
-
-const selectorMonitor = $<HTMLSelectElement>(document, "#monitor");
-const monitores = await invoke<InfoMonitor[]>("listar_monitores").catch(() => []);
-selectorMonitor.innerHTML =
-  `<option value="">Principal</option>` +
-  monitores.map((m) => `<option value="${escapar(m.nombre)}">${escapar(m.etiqueta)}</option>`).join("");
-selectorMonitor.value = grupos.ajustes.monitor ?? "";
-selectorMonitor.addEventListener("change", () => {
-  grupos.ajustes.monitor = selectorMonitor.value || null;
-  void guardarGrupo("ajustes");
 });
 
 // ---------- Inicio con Windows ----------
