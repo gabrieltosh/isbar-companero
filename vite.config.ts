@@ -10,11 +10,11 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // Dos páginas: la isla y la ventana de configuración. WebView2 admite ES2022 (await de nivel superior)
+  // Tres páginas: la isla, el compañero y la ventana de configuración. WebView2 admite ES2022 (await de nivel superior)
   build: {
     target: "es2022",
     rollupOptions: {
-      input: { isla: "index.html", config: "config.html" },
+      input: { isla: "index.html", companero: "companero.html", config: "config.html" },
     },
   },
   // 2. tauri expects a fixed port, fail if that port is not available

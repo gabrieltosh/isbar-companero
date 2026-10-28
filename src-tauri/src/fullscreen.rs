@@ -1,5 +1,5 @@
-//! Oculta la isla cuando hay una aplicación a pantalla completa (juegos, vídeos)
-//! en el mismo monitor, y la vuelve a mostrar al salir.
+//! Oculta la isla (o el compañero) cuando hay una aplicación a pantalla completa
+//! (juegos, vídeos) en el mismo monitor, y la vuelve a mostrar al salir.
 
 use std::sync::atomic::Ordering;
 use std::thread;
@@ -12,7 +12,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetForegroundWindow, GetWindowRect, ShowWindow, SW_HIDE, SW_SHOWNOACTIVATE,
 };
 
-use crate::window::{aplicar_visibilidad, EstadoIsla};
+use crate::window::{aplicar_visibilidad, ventana_activa, EstadoIsla};
 
 const INTERVALO: Duration = Duration::from_millis(500);
 /// El escritorio y la barra de tareas ocupan todo el monitor pero no cuentan.
@@ -21,7 +21,7 @@ const CLASES_ESCRITORIO: [&str; 3] = ["Progman", "WorkerW", "Shell_TrayWnd"];
 pub fn iniciar(app: AppHandle) {
     thread::spawn(move || loop {
         thread::sleep(INTERVALO);
-        let Some(ventana) = app.get_webview_window("main") else {
+        let Some(ventana) = ventana_activa(&app) else {
             continue;
         };
         let Ok(isla) = ventana.hwnd() else {

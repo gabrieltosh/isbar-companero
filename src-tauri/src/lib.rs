@@ -1,5 +1,6 @@
 mod autoarranque;
 mod claude_uso;
+mod companero;
 mod tray;
 mod window;
 
@@ -26,6 +27,11 @@ pub fn run() {
         window::set_island_rect,
         window::aplicar_ajustes_ventana,
         window::listar_monitores,
+        window::aplicar_estilo,
+        companero::iniciar_companero,
+        companero::set_companero_rects,
+        companero::arrastrar_companero,
+        companero::salir_del_borde,
         tray::abrir_configuracion_cmd,
         claude_uso::leer_uso_claude,
         autoarranque::autoarranque_activo,
@@ -46,6 +52,11 @@ pub fn run() {
         window::set_island_rect,
         window::aplicar_ajustes_ventana,
         window::listar_monitores,
+        window::aplicar_estilo,
+        companero::iniciar_companero,
+        companero::set_companero_rects,
+        companero::arrastrar_companero,
+        companero::salir_del_borde,
         tray::abrir_configuracion_cmd,
         claude_uso::leer_uso_claude,
         autoarranque::autoarranque_activo,

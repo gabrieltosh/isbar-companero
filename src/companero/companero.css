@@ -1,0 +1,41 @@
+/* Compañero: una pantallita de cristal oscuro con cara LED. */
+
+:root {
+  --cara: #f5f7ff;
+  --cristal: rgba(8, 8, 12, 0.88);
+  --borde-cristal: rgba(255, 255, 255, 0.1);
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+/* Debe coincidir con MARGEN y LADO de companero.rs */
+.companero {
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--cristal);
+  box-shadow: inset 0 0 0 1px var(--borde-cristal);
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+
+.companero.arrastrando {
+  cursor: grabbing;
+}
+
+#cara {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}

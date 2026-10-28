@@ -11,17 +11,17 @@ use crate::window::{aplicar_visibilidad, EstadoIsla};
 /// Mismos argumentos que la ventana de la isla (tauri.conf.json): todas las ventanas
 /// comparten carpeta de datos de WebView2 y deben arrancar con las mismas opciones.
 /// Son los de Tauri por defecto más el permiso para sonar sin un clic previo.
-const ARGS_NAVEGADOR: &str =
+pub(crate) const ARGS_NAVEGADOR: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required";
 
 pub fn crear(app: &AppHandle) -> tauri::Result<()> {
-    let alternar = MenuItem::with_id(app, "alternar", "Mostrar/ocultar isla", true, None::<&str>)?;
+    let alternar = MenuItem::with_id(app, "alternar", "Mostrar/ocultar", true, None::<&str>)?;
     let config = MenuItem::with_id(app, "config", "Configuración", true, None::<&str>)?;
     let salir = MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&alternar, &config, &PredefinedMenuItem::separator(app)?, &salir])?;
 
     let mut icono = TrayIconBuilder::with_id("isla")
-        .tooltip("Isla")
+        .tooltip("isbar")
         .menu(&menu)
         // Clic izquierdo: mostrar/ocultar. Clic derecho: menú
         .show_menu_on_left_click(false)

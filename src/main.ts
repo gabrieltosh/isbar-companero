@@ -355,6 +355,8 @@ async function aplicarAjustes(): Promise<void> {
     ajustes: { escala: a.escala, desplazamiento: a.desplazamiento, monitor: a.monitor },
   }).catch(console.error);
   informarRect(abierta ? "expandida" : "compacta");
+  // Rust muestra la isla o el compañero según el estilo elegido
+  await invoke("aplicar_estilo", { estilo: a.estilo }).catch(console.error);
 }
 
 window.addEventListener("resize", () => informarRect(abierta ? "expandida" : "compacta"));

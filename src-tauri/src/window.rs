@@ -3,6 +3,7 @@
 //! La ventana es más grande que la píldora (para dejar sitio a las animaciones),
 //! así que un hilo comprueba la posición del cursor y solo deja que la ventana
 //! reciba el ratón cuando está encima del rectángulo de la píldora.
+//! Lo mismo para la ventana del compañero (companero.rs), con varios rectángulos.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -16,8 +17,8 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Webview
 const ANCHO_BASE: f64 = 560.0;
 const ALTO_BASE: f64 = 290.0;
 
-/// Rectángulo actual de la píldora en píxeles lógicos (CSS), relativo a la ventana.
-#[derive(Clone, Copy, Default)]
+/// Rectángulo en píxeles lógicos (CSS), relativo a la ventana.
+#[derive(Clone, Copy, Default, Deserialize)]
 pub struct RectIsla {
     x: f64,
     y: f64,
@@ -54,8 +55,14 @@ pub struct EstadoIsla {
     ajustes: Mutex<AjustesVentana>,
     /// El usuario la ha dejado visible desde la bandeja
     pub visible_usuario: AtomicBool,
-    /// Hay una aplicación a pantalla completa en el monitor de la isla
+    /// Hay una aplicación a pantalla completa en el monitor de la isla (o del compañero)
     pub pantalla_completa: AtomicBool,
+    /// Estilo elegido: compañero en lugar de isla
+    pub companero: AtomicBool,
+    /// La ventana del compañero ya está colocada y se puede mostrar
+    pub companero_listo: AtomicBool,
+    /// Zonas del compañero que reciben el ratón (el compañero, un globo, el panel)
+    pub rects_companero: Mutex<Vec<RectIsla>>,
 }
 
 impl Default for EstadoIsla {
@@ -65,6 +72,9 @@ impl Default for EstadoIsla {
             ajustes: Mutex::new(AjustesVentana::default()),
             visible_usuario: AtomicBool::new(true),
             pantalla_completa: AtomicBool::new(false),
+            companero: AtomicBool::new(false),
+            companero_listo: AtomicBool::new(false),
+            rects_companero: Mutex::new(Vec::new()),
         }
     }
 }
@@ -145,55 +155,121 @@ pub fn colocar(ventana: &WebviewWindow, ajustes: &AjustesVentana) -> tauri::Resu
     ventana.set_position(PhysicalPosition::new(x, y))
 }
 
-/// Muestra u oculta la isla según la bandeja y la pantalla completa.
+/// Ventana del estilo elegido (la isla o el compañero).
+pub fn ventana_activa(app: &AppHandle) -> Option<WebviewWindow> {
+    let etiqueta = if app.state::<EstadoIsla>().companero.load(Ordering::SeqCst) {
+        crate::companero::ETIQUETA
+    } else {
+        "main"
+    };
+    app.get_webview_window(etiqueta)
+}
+
+/// Muestra la ventana del estilo elegido (según la bandeja y la pantalla completa) y oculta la otra.
 pub fn aplicar_visibilidad(app: &AppHandle) {
     let estado = app.state::<EstadoIsla>();
     let visible = estado.visible_usuario.load(Ordering::SeqCst) && !estado.pantalla_completa.load(Ordering::SeqCst);
-    let Some(ventana) = app.get_webview_window("main") else {
-        return;
-    };
+    let companero = estado.companero.load(Ordering::SeqCst);
+    let listo = estado.companero_listo.load(Ordering::SeqCst);
+    if let Some(isla) = app.get_webview_window("main") {
+        fijar_visible(&isla, visible && !companero);
+    }
+    if let Some(ventana) = app.get_webview_window(crate::companero::ETIQUETA) {
+        fijar_visible(&ventana, visible && companero && listo);
+    }
+}
+
+/// Se muestra y oculta directamente con Windows (sin quitar el foco). Para Tauri las ventanas
+/// siguen "visibles": si no, al cambiar el click-through Tauri las volvería a ocultar.
+fn fijar_visible(ventana: &WebviewWindow, visible: bool) {
     #[cfg(target_os = "windows")]
-    crate::fullscreen::fijar_visible(&ventana, visible);
+    crate::fullscreen::fijar_visible(ventana, visible);
     #[cfg(not(target_os = "windows"))]
     {
         let _ = if visible { ventana.show() } else { ventana.hide() };
     }
 }
 
-/// Hilo que cada ~30 ms decide si la ventana deja pasar los clics.
-/// Además avisa al frontend con `isla-hover` cuando el cursor entra o sale.
+/// Cambia entre la isla y el compañero (lo llama la isla al leer los ajustes).
+/// Es async porque crear una ventana desde un comando síncrono bloquea el hilo principal en Windows.
+#[tauri::command]
+pub async fn aplicar_estilo(app: AppHandle, estilo: String) -> Result<(), String> {
+    let companero = estilo == "companero";
+    app.state::<EstadoIsla>().companero.store(companero, Ordering::SeqCst);
+    if companero && let Err(e) = crate::companero::crear(&app) {
+        eprintln!("compañero: no se pudo crear la ventana: {e}");
+        return Err(e.to_string());
+    }
+    aplicar_visibilidad(&app);
+    Ok(())
+}
+
+/// Posición del cursor en píxeles lógicos relativa a una ventana.
+fn cursor_en(app: &AppHandle, ventana: &WebviewWindow) -> Option<(f64, f64)> {
+    let (Ok(cursor), Ok(pos), Ok(escala)) = (app.cursor_position(), ventana.outer_position(), ventana.scale_factor())
+    else {
+        return None;
+    };
+    Some(((cursor.x - f64::from(pos.x)) / escala, (cursor.y - f64::from(pos.y)) / escala))
+}
+
+/// Deja pasar los clics fuera de los rectángulos y avisa con `evento` al entrar o salir.
+fn actualizar_click_through(ventana: &WebviewWindow, dentro: bool, antes: &mut Option<bool>, evento: &str) {
+    if *antes == Some(dentro) {
+        return;
+    }
+    if let Err(e) = ventana.set_ignore_cursor_events(!dentro) {
+        eprintln!("click-through: {e}");
+        return;
+    }
+    let _ = ventana.emit(evento, dentro);
+    *antes = Some(dentro);
+}
+
+/// Hilo que cada ~30 ms decide si cada ventana deja pasar los clics.
+/// Avisa con `isla-hover` / `companero-hover` cuando el cursor entra o sale, y al compañero
+/// le dice dónde está el cursor (`companero-cursor`) para que lo siga con la mirada.
 pub fn iniciar_click_through(app: AppHandle) {
     thread::spawn(move || {
-        let mut dentro_antes: Option<bool> = None;
+        let mut dentro_isla: Option<bool> = None;
+        let mut dentro_companero: Option<bool> = None;
+        let mut cursor_antes = (f64::NAN, f64::NAN);
         loop {
             thread::sleep(Duration::from_millis(30));
-            let Some(ventana) = app.get_webview_window("main") else {
+            let estado = app.state::<EstadoIsla>();
+            let companero = estado.companero.load(Ordering::SeqCst);
+            // Oculta (bandeja o pantalla completa): no se toca, para que no vuelva a aparecer
+            if !estado.visible_usuario.load(Ordering::SeqCst) || estado.pantalla_completa.load(Ordering::SeqCst) {
                 continue;
-            };
-            let (Ok(cursor), Ok(pos), Ok(escala)) = (
-                app.cursor_position(),
-                ventana.outer_position(),
-                ventana.scale_factor(),
-            ) else {
-                continue;
-            };
-            let rect = app
-                .state::<EstadoIsla>()
-                .rect
-                .lock()
-                .map(|r| *r)
-                .unwrap_or_default();
-            let lx = (cursor.x - f64::from(pos.x)) / escala;
-            let ly = (cursor.y - f64::from(pos.y)) / escala;
-            let dentro = rect.contiene(lx, ly);
+            }
 
-            if dentro_antes != Some(dentro) {
-                if let Err(e) = ventana.set_ignore_cursor_events(!dentro) {
-                    eprintln!("click-through: {e}");
-                    continue;
-                }
-                let _ = app.emit("isla-hover", dentro);
-                dentro_antes = Some(dentro);
+            // Solo se toca la ventana del estilo activo: la otra está oculta y debe seguir así
+            if !companero
+                && let Some(ventana) = app.get_webview_window("main")
+                && let Some((x, y)) = cursor_en(&app, &ventana)
+            {
+                let rect = estado.rect.lock().map(|r| *r).unwrap_or_default();
+                actualizar_click_through(&ventana, rect.contiene(x, y), &mut dentro_isla, "isla-hover");
+            }
+
+            if !companero {
+                continue;
+            }
+            let Some(ventana) = app.get_webview_window(crate::companero::ETIQUETA) else {
+                continue;
+            };
+            let Some((x, y)) = cursor_en(&app, &ventana) else {
+                continue;
+            };
+            let dentro = estado
+                .rects_companero
+                .lock()
+                .map(|rects| rects.iter().any(|r| r.contiene(x, y)))
+                .unwrap_or(false);
+            actualizar_click_through(&ventana, dentro, &mut dentro_companero, "companero-hover");
+            if (x - cursor_antes.0).abs() > 2.0 || (y - cursor_antes.1).abs() > 2.0 {
+                let _ = ventana.emit("companero-cursor", (x, y));
+                cursor_antes = (x, y);
             }
         }
     });
