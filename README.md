@@ -2,12 +2,15 @@
   <img src="app-icon.svg" width="110" alt="Logo de isbar" />
 </p>
 
-<h1 align="center">isbar</h1>
+<h1 align="center">isbar Compañero</h1>
 
 <p align="center">
-  <b>Tu isla dinámica en Windows.</b><br />
-  Una píldora negra anclada arriba al centro de la pantalla que se expande al pasar el ratón.
+  <b>Un asistente con cara que vive en tu pantalla.</b><br />
+  Se mueve, reacciona, te avisa con globos de pensamiento y le puedes pedir cosas.
+  Nace de <a href="https://github.com/gabrieltosh/isbar">isbar</a> y reutiliza su base.
 </p>
+
+> En desarrollo. El plan está en [PLAN-COMPANERO.md](PLAN-COMPANERO.md).
 
 <p align="center">
   <a href="https://gabrieltosh.github.io/isbar/">Web</a> ·
