@@ -203,11 +203,17 @@ pub fn arrastrar_companero(app: AppHandle, dx: f64, dy: f64) -> Result<(), Strin
     let ventana = ventana(&app)?;
     let escala = ventana.scale_factor().map_err(|e| e.to_string())?;
     thread::spawn(move || {
+        let mut vuelta = 0u32;
         while boton_pulsado() {
             if let Ok(cursor) = app.cursor_position() {
                 let x = (cursor.x - dx * escala).round() as i32;
                 let y = (cursor.y - dy * escala).round() as i32;
                 let _ = ventana.set_position(PhysicalPosition::new(x, y));
+                // Cada ~16 ms se avisa de dónde va, para que se incline y se estire según la velocidad
+                vuelta += 1;
+                if vuelta.is_multiple_of(2) {
+                    let _ = ventana.emit("companero-moviendo", (f64::from(x) / escala, f64::from(y) / escala));
+                }
             }
             thread::sleep(PASO_ARRASTRE);
         }

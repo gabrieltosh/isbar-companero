@@ -18,6 +18,8 @@ const DURACION_RUTINA = 8_000;
 const OCURRENCIA_CADA: [number, number] = [25_000, 60_000];
 const OCURRENCIA_CADA_TRANQUILO: [number, number] = [60_000, 120_000];
 const DURACION_OCURRENCIA = 4_500;
+/** Al cogerlo, la sorpresa dura esto; después disfruta del paseo. */
+const SORPRESA_AL_COGER = 500;
 /** Usando el PC sin parar este tiempo, empieza a bostezar de vez en cuando. */
 const SESION_LARGA = 50 * 60_000;
 
@@ -28,6 +30,8 @@ export interface Contexto {
   /** El ratón está encima */
   encima: boolean;
   arrastrando: boolean;
+  /** Cuánto lleva cogido, en ms */
+  arrastreMs: number;
   /** Tiempo sin tocar el ratón ni el teclado, en ms */
   inactivo: number;
   /** Se está escribiendo (hay actividad pero el ratón está quieto) */
@@ -119,7 +123,8 @@ export function decidir(ctx: Contexto): Decision {
   }
   pasajero = null;
 
-  if (ctx.arrastrando) return { expresion: "sorpresa", rutina: null, progreso: 0 };
+  // Al cogerlo se sorprende; si lo sigues paseando, se pone contento
+  if (ctx.arrastrando) return { expresion: ctx.arrastreMs < SORPRESA_AL_COGER ? "sorpresa" : "feliz", rutina: null, progreso: 0 };
   if (ctx.encima) return { expresion: "feliz", rutina: null, progreso: 0 };
   if (ctx.peticion) return { expresion: ctx.peticion, rutina: null, progreso: 0 };
 

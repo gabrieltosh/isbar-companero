@@ -33,8 +33,19 @@ const GIROS_MAREO = 6;
 const VENTANA_MAREO_MS = 700;
 const DISTANCIA_MAREO = 110;
 /** Con el cursor a menos de CERCA_MIN px lo sigue del todo; a partir de CERCA_MAX, nada. */
-const CERCA_MIN = 140;
-const CERCA_MAX = 320;
+const CERCA_MIN = 300;
+const CERCA_MAX = 700;
+/** Hacer círculos con el ratón alrededor: tantas vueltas en tan poco tiempo lo marean. */
+const VUELTAS_MAREO = 2;
+const TIEMPO_VUELTAS_MS = 3000;
+const RADIO_VUELTAS = 260;
+/** Balanceo al arrastrarlo (y al soltarlo): grados por cada px/ms de velocidad, muelle y freno. */
+const INCLINACION_PASEO = 9;
+const MAX_INCLINACION = 28;
+const RIGIDEZ = 0.1;
+const AMORTIGUACION = 0.16;
+/** Sacudirlo así de veces mientras lo llevas lo deja mareado al soltarlo. */
+const SACUDIDAS_MAREO = 4;
 /** Teclado activo con el ratón quieto este tiempo = se está escribiendo. */
 const ESCRIBIENDO_MS = 2500;
 /** Este tiempo sin usar el PC termina la sesión (el cansancio por llevar mucho rato vuelve a cero). */
@@ -73,6 +84,18 @@ let escalaX = 1;
 let escalaY = 1;
 // Se inclina un poco hacia el cursor cuando está cerca
 const inclinacion = { x: 0, y: 0 };
+// Paseo: velocidad de la ventana mientras se arrastra y balanceo del cuerpo (como un péndulo)
+const paseo = {
+  desde: 0,
+  vx: 0,
+  vy: 0,
+  ultima: null as { x: number; y: number; t: number } | null,
+  angulo: 0,
+  velAngular: 0,
+  sacudidas: [] as number[],
+  direccion: 0,
+};
+let ultimoFotograma = performance.now();
 const pose: Pose = { miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0 };
 let expresionActual: Expresion = "normal";
 let progresoActual = 0;
@@ -93,6 +116,7 @@ function fotograma(ahora: number): void {
     encima,
     arrastrando,
     inactivo,
+    arrastreMs: arrastrando ? ahora - paseo.desde : 0,
     // Hay actividad (teclado) pero el ratón lleva un rato quieto
     escribiendo: inactivo < ESCRIBIENDO_MS && ahora - ultimoMovimiento > ESCRIBIENDO_MS,
     sesion: ahora - sesionDesde,
@@ -123,7 +147,11 @@ function fotograma(ahora: number): void {
   const d = Math.hypot(vx, vy) || 1;
   // 1 con el cursor cerca del compañero; baja a 0 al alejarse
   const cerca = Math.max(0, Math.min(1, (CERCA_MAX - d / config.tamano) / (CERCA_MAX - CERCA_MIN)));
-  if (borde !== 0) {
+  if (arrastrando) {
+    // Mira hacia donde lo llevas
+    miraX = Math.max(-4, Math.min(4, paseo.vx * 3));
+    miraY = Math.max(-3.5, Math.min(3.5, paseo.vy * 3));
+  } else if (borde !== 0) {
     miraX = -borde * 3.5;
   } else if (libre && cerca > 0) {
     miraX = (vx / d) * 4 * cerca;
@@ -200,12 +228,34 @@ function fotograma(ahora: number): void {
   } else if (expresion === "saludo") {
     estiraY = 1 + Math.abs(Math.sin(ahora / 260)) * 0.06;
   }
+  // Paseo: se estira en la dirección en que lo mueves y se balancea como un péndulo
+  const dt = Math.min(3, (ahora - ultimoFotograma) / 16.7);
+  ultimoFotograma = ahora;
+  if (arrastrando && paseo.ultima && ahora - paseo.ultima.t > 80) {
+    // Lo tienes cogido pero quieto: la velocidad cae a cero
+    paseo.vx *= 0.8;
+    paseo.vy *= 0.8;
+  }
+  const objetivoAngulo = arrastrando
+    ? Math.max(-MAX_INCLINACION, Math.min(MAX_INCLINACION, -paseo.vx * INCLINACION_PASEO))
+    : 0;
+  const aceleracion = (objetivoAngulo - paseo.angulo) * RIGIDEZ - paseo.velAngular * AMORTIGUACION;
+  paseo.velAngular += aceleracion * dt;
+  paseo.angulo += paseo.velAngular * dt;
+  if (arrastrando) {
+    estiraX *= 1 + Math.min(0.14, Math.abs(paseo.vx) * 0.05) - Math.min(0.07, Math.abs(paseo.vy) * 0.025);
+    estiraY *= 1 + Math.min(0.14, Math.abs(paseo.vy) * 0.05) - Math.min(0.07, Math.abs(paseo.vx) * 0.025);
+  }
+  // Cogido (y mientras se balancea al soltarlo) gira desde arriba, como si colgara
+  const colgando = arrastrando || Math.abs(paseo.angulo) > 0.4 || Math.abs(paseo.velAngular) > 0.05;
+  companero.style.transformOrigin = colgando ? "50% 12%" : "50% 100%";
+
   // Respira: más lento de noche, más suave en modo tranquilo
   const respira = 1 + Math.sin(ahora / (noche ? 520 : 320)) * (config.tranquilo ? 0.01 : 0.018);
   const agarre = arrastrando ? 1.12 : 1;
   const sx = respira * agarre * escalaX * estiraX;
   const sy = respira * agarre * escalaY * estiraY;
-  companero.style.transform = `translate(${inclinacion.x.toFixed(2)}px, ${inclinacion.y.toFixed(2)}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
+  companero.style.transform = `translate(${inclinacion.x.toFixed(2)}px, ${inclinacion.y.toFixed(2)}px) rotate(${paseo.angulo.toFixed(2)}deg) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
@@ -263,6 +313,10 @@ companero.addEventListener("pointerdown", (e) => {
   tArrastre = window.setTimeout(() => {
     arrastrando = true;
     companero.classList.add("arrastrando");
+    // Un saltito al cogerlo
+    Object.assign(paseo, { desde: performance.now(), vx: 0, vy: 0, ultima: null, sacudidas: [], direccion: 0 });
+    escalaX = 0.88;
+    escalaY = 1.14;
     // Rust mueve la ventana con el cursor hasta que se suelta el botón
     invoke("arrastrar_companero", { dx: clientX, dy: clientY }).catch((err) => {
       console.error("compañero:", err);
@@ -300,6 +354,9 @@ listen<Soltado>("companero-soltado", ({ payload }) => {
   if (arrastrando) {
     escalaX = 1.18;
     escalaY = 0.8;
+    // Si lo sacudiste mientras lo llevabas, queda mareado
+    const ahora = performance.now();
+    if (paseo.sacudidas.filter((s) => ahora - s < 1500).length >= SACUDIDAS_MAREO) gesto("mareado", 2400);
   }
   pulsado = false;
   arrastrando = false;
@@ -310,19 +367,69 @@ listen<Soltado>("companero-soltado", ({ payload }) => {
   void guardar("companeroPos", { x: payload.x, y: payload.y });
 }).catch(console.error);
 
+// Dónde va mientras lo arrastras: velocidad (para inclinarse y estirarse) y sacudidas
+listen<[number, number]>("companero-moviendo", ({ payload }) => {
+  const [x, y] = payload;
+  const t = performance.now();
+  if (paseo.ultima) {
+    const dt = Math.max(8, t - paseo.ultima.t);
+    const vx = (x - paseo.ultima.x) / dt;
+    const vy = (y - paseo.ultima.y) / dt;
+    paseo.vx = acercar(paseo.vx, vx, 0.5);
+    paseo.vy = acercar(paseo.vy, vy, 0.5);
+    const direccion = Math.abs(vx) > 0.5 ? Math.sign(vx) : 0;
+    if (direccion !== 0 && direccion !== paseo.direccion) {
+      paseo.sacudidas.push(t);
+      paseo.direccion = direccion;
+    }
+  }
+  paseo.ultima = { x, y, t };
+}).catch(console.error);
+
 listen<boolean>("companero-hover", ({ payload }) => {
   encima = payload;
 }).catch(console.error);
 
-// Dónde está el cursor (para mirarlo) y si lo agitan cerca (se marea)
+// Dónde está el cursor (para mirarlo) y si lo agitan cerca o le hacen círculos (se marea)
 let giros: number[] = [];
 let direccionX = 0;
+let vueltas: { t: number; giro: number }[] = [];
+let anguloAntes: number | null = null;
+
+/** Suma lo que gira el cursor alrededor del compañero; dos vueltas seguidas lo marean. */
+function contarVueltas(x: number, y: number): void {
+  const dx = x - centro();
+  const dy = y - centro();
+  if (Math.hypot(dx, dy) > RADIO_VUELTAS * config.tamano) {
+    vueltas = [];
+    anguloAntes = null;
+    return;
+  }
+  const angulo = Math.atan2(dy, dx);
+  if (anguloAntes !== null) {
+    let giro = angulo - anguloAntes;
+    if (giro > Math.PI) giro -= 2 * Math.PI;
+    if (giro < -Math.PI) giro += 2 * Math.PI;
+    const ahora = performance.now();
+    vueltas = vueltas.filter((v) => ahora - v.t < TIEMPO_VUELTAS_MS);
+    vueltas.push({ t: ahora, giro });
+    const total = Math.abs(vueltas.reduce((s, v) => s + v.giro, 0));
+    if (total >= VUELTAS_MAREO * 2 * Math.PI && !hayGesto()) {
+      gesto("mareado", 2400);
+      vueltas = [];
+    }
+  }
+  anguloAntes = angulo;
+}
+
 listen<[number, number]>("companero-cursor", ({ payload }) => {
   const [x, y] = payload;
   const dx = x - cursor.x;
   cursor = { x, y };
   ultimoMovimiento = performance.now();
-  if (arrastrando || Math.hypot(x - centro(), y - centro()) > DISTANCIA_MAREO * config.tamano) return;
+  if (arrastrando) return;
+  contarVueltas(x, y);
+  if (Math.hypot(x - centro(), y - centro()) > DISTANCIA_MAREO * config.tamano) return;
   const direccion = Math.sign(dx);
   if (direccion !== 0 && direccion !== direccionX) {
     const ahora = performance.now();
