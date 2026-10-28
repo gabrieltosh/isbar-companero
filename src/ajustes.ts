@@ -74,6 +74,32 @@ export const PAUSAS_POR_DEFECTO: ConfigPausas = {
   vistaIntervalo: 20,
 };
 
+/** Aspecto y carácter del compañero. */
+export interface ConfigCompanero {
+  /** Color de la cara (CSS) */
+  color: string;
+  /** 0.8 pequeño, 1 mediano, 1.25 grande */
+  tamano: number;
+  /** Sin rutinas llamativas (silbar, estirarse) y con menos movimiento */
+  tranquilo: boolean;
+}
+
+export const COMPANERO_POR_DEFECTO: ConfigCompanero = { color: "#f5f7ff", tamano: 1, tranquilo: false };
+
+/** Colores de cara que se pueden elegir: [valor, nombre], en este orden. */
+export const COLORES_COMPANERO: [string, string][] = [
+  ["#f5f7ff", "Blanco"],
+  ["#4d8dff", "Azul"],
+  ["#ff7a1a", "Naranja"],
+  ["#c6f432", "Lima"],
+];
+
+export const TAMANOS_COMPANERO: [string, string][] = [
+  ["0.8", "Pequeño"],
+  ["1", "Mediano"],
+  ["1.25", "Grande"],
+];
+
 /** Sonido común de los avisos (pausas activas y recordatorio de agua). */
 export interface ConfigSonido {
   activo: boolean;

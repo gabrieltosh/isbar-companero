@@ -1,7 +1,8 @@
 /* Compañero: una pantallita de cristal oscuro con cara LED. */
 
 :root {
-  --cara: #f5f7ff;
+  /* Tamaño elegido en la configuración (lo fija main.ts) */
+  --e: 1;
   --cristal: rgba(8, 8, 12, 0.88);
   --borde-cristal: rgba(255, 255, 255, 0.1);
 }
@@ -16,18 +17,19 @@ body {
   user-select: none;
 }
 
-/* Debe coincidir con MARGEN y LADO de companero.rs */
+/* Con tamaño 1 debe coincidir con MARGEN (24) y LADO (64) de companero.rs */
 .companero {
   position: absolute;
-  left: 24px;
-  top: 24px;
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  left: calc(24px * var(--e));
+  top: calc(24px * var(--e));
+  width: calc(64px * var(--e));
+  height: calc(64px * var(--e));
+  border-radius: calc(18px * var(--e));
   background: var(--cristal);
   box-shadow: inset 0 0 0 1px var(--borde-cristal);
   cursor: pointer;
   transform-origin: 50% 100%;
+  transition: opacity 600ms ease;
 }
 
 .companero.arrastrando {
@@ -37,5 +39,7 @@ body {
 #cara {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }

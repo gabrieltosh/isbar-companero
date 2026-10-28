@@ -3,15 +3,19 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import {
   AGUA_POR_DEFECTO,
+  COLORES_COMPANERO,
+  COMPANERO_POR_DEFECTO,
   EVENTO_AJUSTES,
   NOMBRES_VISTAS,
   PAUSAS_POR_DEFECTO,
   POMODORO_POR_DEFECTO,
   SONIDO_POR_DEFECTO,
+  TAMANOS_COMPANERO,
   leerAjustes,
   type Ajustes,
   type Estilo,
   type ConfigAgua,
+  type ConfigCompanero,
   type ConfigPausas,
   type ConfigPomodoro,
   type ConfigSonido,
@@ -32,12 +36,14 @@ const grupos: {
   agua: ConfigAgua;
   pausas: ConfigPausas;
   sonido: ConfigSonido;
+  companero: ConfigCompanero;
 } = {
   ajustes: await leerAjustes(),
   pomodoro: await leer("pomodoroConfig", POMODORO_POR_DEFECTO),
   agua: await leer("aguaConfig", AGUA_POR_DEFECTO),
   pausas: { ...PAUSAS_POR_DEFECTO, ...(await leer<Partial<ConfigPausas>>("pausasConfig", {})) },
   sonido: { ...SONIDO_POR_DEFECTO, ...(await leer<Partial<ConfigSonido>>("sonidoConfig", {})) },
+  companero: { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) },
 };
 const CLAVES: Record<keyof typeof grupos, string> = {
   ajustes: "ajustes",
@@ -45,6 +51,7 @@ const CLAVES: Record<keyof typeof grupos, string> = {
   agua: "aguaConfig",
   pausas: "pausasConfig",
   sonido: "sonidoConfig",
+  companero: "companeroConfig",
 };
 
 async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
@@ -136,6 +143,28 @@ pintarValores();
 
 // Escuchar el aviso de pausa con el volumen elegido
 $(document, "#probar-sonido").addEventListener("click", () => campanita(grupos.sonido.volumen));
+
+// ---------- Compañero ----------
+
+/** Rellena un selector con sus opciones y guarda el valor elegido en el compañero. */
+function selectorCompanero(id: string, opciones: [string, string][], valor: string, fijar: (v: string) => void): void {
+  const selector = $<HTMLSelectElement>(document, id);
+  selector.innerHTML = opciones
+    .map(([v, nombre]) => `<option value="${v}">${escapar(nombre)}</option>`)
+    .join("");
+  selector.value = valor;
+  selector.addEventListener("change", () => {
+    fijar(selector.value);
+    void guardarGrupo("companero");
+  });
+}
+
+selectorCompanero("#companero-color", COLORES_COMPANERO, grupos.companero.color, (v) => {
+  grupos.companero.color = v;
+});
+selectorCompanero("#companero-tamano", TAMANOS_COMPANERO, String(grupos.companero.tamano), (v) => {
+  grupos.companero.tamano = Number(v);
+});
 
 // ---------- Estilo ----------
 

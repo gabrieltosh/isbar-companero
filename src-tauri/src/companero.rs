@@ -5,23 +5,38 @@
 //! con el cursor hasta que se suelta el botón. Al soltarlo cerca del borde izquierdo
 //! o derecho del monitor se esconde a medias ("se asoma").
 //! La posición la guarda el frontend (evento `companero-soltado`) y la devuelve al arrancar.
+//! Además avisa cada pocos segundos de cuánto tiempo lleva el usuario sin tocar el PC
+//! (`companero-inactivo`), para que el compañero se canse y se duerma.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+};
 
 use crate::window::{aplicar_visibilidad, EstadoIsla, RectIsla};
 
 pub const ETIQUETA: &str = "companero";
 
-/// Lado de la ventana y del compañero, en píxeles lógicos.
+/// Lado de la ventana y del compañero con tamaño 1, en píxeles lógicos.
 const LADO_VENTANA: f64 = 112.0;
 const LADO: f64 = 64.0;
-/// Margen entre el borde de la ventana y el compañero.
-const MARGEN: f64 = (LADO_VENTANA - LADO) / 2.0;
+/// Tamaño elegido en la configuración (1 = mediano).
+static ESCALA: Mutex<f64> = Mutex::new(1.0);
+/// Cada cuánto se avisa del tiempo sin usar el PC.
+const AVISO_INACTIVIDAD: Duration = Duration::from_secs(2);
+static INACTIVIDAD_INICIADA: AtomicBool = AtomicBool::new(false);
+
+/// Lado de la ventana, lado del compañero y margen entre ambos, con el tamaño elegido.
+fn medidas() -> (f64, f64, f64) {
+    let e = ESCALA.lock().map(|e| *e).unwrap_or(1.0);
+    let (ventana, lado) = (LADO_VENTANA * e, LADO * e);
+    (ventana, lado, (ventana - lado) / 2.0)
+}
 /// Separación mínima con los bordes del área de trabajo.
 const SEPARACION: f64 = 16.0;
 /// A menos de esta distancia de un lado, al soltarlo se esconde a medias.
@@ -52,7 +67,7 @@ pub fn crear(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     }
     let ventana = WebviewWindowBuilder::new(app, ETIQUETA, WebviewUrl::App("companero.html".into()))
         .title("isbar")
-        .inner_size(LADO_VENTANA, LADO_VENTANA)
+        .inner_size(medidas().0, medidas().0)
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -67,7 +82,23 @@ pub fn crear(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .build()?;
     ventana.set_ignore_cursor_events(true)?;
     aplicar_visibilidad(app);
+    iniciar_inactividad(app.clone());
     Ok(ventana)
+}
+
+/// Hilo que avisa al compañero de cuánto tiempo lleva el usuario sin tocar el ratón ni el teclado.
+fn iniciar_inactividad(app: AppHandle) {
+    if INACTIVIDAD_INICIADA.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    thread::spawn(move || loop {
+        thread::sleep(AVISO_INACTIVIDAD);
+        if app.state::<EstadoIsla>().companero.load(Ordering::SeqCst)
+            && let Some(ventana) = app.get_webview_window(ETIQUETA)
+        {
+            let _ = ventana.emit("companero-inactivo", ms_inactivo());
+        }
+    });
 }
 
 fn ventana(app: &AppHandle) -> Result<WebviewWindow, String> {
@@ -78,7 +109,7 @@ fn ventana(app: &AppHandle) -> Result<WebviewWindow, String> {
 fn monitor_de(ventana: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {
     let monitores = ventana.available_monitors().ok()?;
     let dentro = monitores.iter().find(|m| {
-        let lado = (LADO_VENTANA * m.scale_factor()) as i32;
+        let lado = (medidas().0 * m.scale_factor()) as i32;
         let (cx, cy) = (x + lado / 2, y + lado / 2);
         let (p, t) = (m.position(), m.size());
         cx >= p.x && cx < p.x + t.width as i32 && cy >= p.y && cy < p.y + t.height as i32
@@ -97,21 +128,22 @@ fn destino(ventana: &WebviewWindow, x: i32, y: i32, permitir_borde: bool) -> (i3
     };
     let dpi = monitor.scale_factor();
     let px = |v: f64| (v * dpi).round() as i32;
+    let (_, lado, margen) = medidas();
     let area = monitor.work_area();
     let (izq, arriba) = (area.position.x, area.position.y);
     let (der, abajo) = (izq + area.size.width as i32, arriba + area.size.height as i32);
 
     // Caja del compañero dentro de la ventana
-    let (cx, cy) = (x + px(MARGEN), y + px(MARGEN));
-    let cy = cy.clamp(arriba + px(SEPARACION), (abajo - px(SEPARACION) - px(LADO)).max(arriba));
+    let (cx, cy) = (x + px(margen), y + px(margen));
+    let cy = cy.clamp(arriba + px(SEPARACION), (abajo - px(SEPARACION) - px(lado)).max(arriba));
     let (cx, borde) = if permitir_borde && cx < izq + px(IMAN) {
-        (izq - px(LADO) / 2, -1)
-    } else if permitir_borde && cx + px(LADO) > der - px(IMAN) {
-        (der - px(LADO) / 2, 1)
+        (izq - px(lado) / 2, -1)
+    } else if permitir_borde && cx + px(lado) > der - px(IMAN) {
+        (der - px(lado) / 2, 1)
     } else {
-        (cx.clamp(izq + px(SEPARACION), (der - px(SEPARACION) - px(LADO)).max(izq)), 0)
+        (cx.clamp(izq + px(SEPARACION), (der - px(SEPARACION) - px(lado)).max(izq)), 0)
     };
-    (cx - px(MARGEN), cy - px(MARGEN), borde)
+    (cx - px(margen), cy - px(margen), borde)
 }
 
 /// Esquina inferior derecha del monitor principal.
@@ -119,7 +151,7 @@ fn posicion_inicial(ventana: &WebviewWindow) -> (i32, i32) {
     match ventana.primary_monitor().ok().flatten() {
         Some(m) => {
             let area = m.work_area();
-            let lado = (LADO_VENTANA * m.scale_factor()) as i32;
+            let lado = (medidas().0 * m.scale_factor()) as i32;
             (
                 area.position.x + area.size.width as i32 - lado - 40,
                 area.position.y + area.size.height as i32 - lado - 40,
@@ -186,6 +218,29 @@ pub fn arrastrar_companero(app: AppHandle, dx: f64, dy: f64) -> Result<(), Strin
     Ok(())
 }
 
+/// Cambia el tamaño del compañero (0.8 pequeño, 1 mediano, 1.25 grande) sin moverlo de sitio.
+#[tauri::command]
+pub fn fijar_tamano_companero(app: AppHandle, escala: f64) -> Result<(), String> {
+    let ventana = ventana(&app)?;
+    let escala = escala.clamp(0.6, 1.6);
+    let antes = medidas().0;
+    if let Ok(mut actual) = ESCALA.lock() {
+        *actual = escala;
+    }
+    let (lado_ventana, _, _) = medidas();
+    // Se mantiene el centro donde estaba
+    let dpi = ventana.scale_factor().map_err(|e| e.to_string())?;
+    let pos = ventana.outer_position().map_err(|e| e.to_string())?;
+    let corrimiento = ((lado_ventana - antes) * dpi / 2.0).round() as i32;
+    ventana
+        .set_size(LogicalSize::new(lado_ventana, lado_ventana))
+        .map_err(|e| e.to_string())?;
+    let (x, y, borde) = destino(&ventana, pos.x - corrimiento, pos.y - corrimiento, true);
+    ventana.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    let _ = ventana.emit("companero-soltado", Soltado { x, y, borde });
+    Ok(())
+}
+
 /// Saca al compañero del borde en el que estaba escondido.
 #[tauri::command]
 pub fn salir_del_borde(app: AppHandle) -> Result<(), String> {
@@ -213,6 +268,27 @@ fn boton_pulsado() -> bool {
         let boton = if GetSystemMetrics(SM_SWAPBUTTON) != 0 { VK_RBUTTON } else { VK_LBUTTON };
         (GetAsyncKeyState(i32::from(boton.0)) as u16) & 0x8000 != 0
     }
+}
+
+/// Milisegundos desde la última vez que se tocó el ratón o el teclado.
+#[cfg(target_os = "windows")]
+fn ms_inactivo() -> u32 {
+    use windows::Win32::System::SystemInformation::GetTickCount;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+    let mut info = LASTINPUTINFO { cbSize: size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    // SAFETY: solo se consulta la hora de la última entrada; la estructura es local.
+    unsafe {
+        if GetLastInputInfo(&mut info).as_bool() {
+            GetTickCount().wrapping_sub(info.dwTime)
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ms_inactivo() -> u32 {
+    0
 }
 
 /// Fuera de Windows todavía no se puede arrastrar (se suelta al momento).
