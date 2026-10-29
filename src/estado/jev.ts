@@ -11,6 +11,13 @@ const MODELO = "jev-latest";
 /** Si tarda más, se sigue con las reglas (Jev suele contestar en menos de medio segundo). */
 const ESPERA_MS = 4000;
 
+/** Cómo se hace la petición: en la app, con Rust (tauri-plugin-http); las pruebas fuera de la app
+ * pueden poner el fetch normal. */
+let pedir: (url: string, init: RequestInit) => Promise<Response> = fetch;
+export function fijarFetchJev(f: (url: string, init: RequestInit) => Promise<Response>): void {
+  pedir = f;
+}
+
 /** Elegir una opción: id → qué significa. */
 export interface PreguntaEleccion {
   type: "choice";
@@ -24,7 +31,14 @@ export interface PreguntaSiNo {
   instructions: string;
 }
 
-export type Pregunta = PreguntaEleccion | PreguntaSiNo;
+/** Puntuar en una escala: los niveles, de menos a más (la respuesta va de 0 al último). */
+export interface PreguntaEscala {
+  type: "score";
+  instructions: string;
+  criteria: string[];
+}
+
+export type Pregunta = PreguntaEleccion | PreguntaSiNo | PreguntaEscala;
 
 export interface RespuestaEleccion {
   type: "choice";
@@ -39,7 +53,17 @@ export interface RespuestaSiNo {
   noul: number;
 }
 
-export type Respuesta = RespuestaEleccion | RespuestaSiNo;
+export interface RespuestaEscala {
+  type: "score";
+  /** Nivel esperado (de 0 al último nivel; con decimales: si duda, queda entre los niveles) */
+  score: number;
+  confidence: number;
+  probabilities: Record<string, number>;
+}
+
+export type Respuesta = RespuestaEleccion | RespuestaSiNo | RespuestaEscala;
+
+type RespuestaDe<Q> = Q extends PreguntaEleccion ? RespuestaEleccion : Q extends PreguntaEscala ? RespuestaEscala : RespuestaSiNo;
 
 interface RespuestaApi {
   model: string;
@@ -59,8 +83,8 @@ export async function preguntarJev<P extends Record<string, Pregunta>>(
   clave: string,
   estado: unknown,
   preguntas: P,
-): Promise<{ modelo: string; respuestas: { [K in keyof P]: P[K] extends PreguntaEleccion ? RespuestaEleccion : RespuestaSiNo } }> {
-  const r = await fetch(URL_API, {
+): Promise<{ modelo: string; respuestas: { [K in keyof P]: RespuestaDe<P[K]> } }> {
+  const r = await pedir(URL_API, {
     method: "POST",
     headers: { Authorization: `Bearer ${clave.trim()}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: MODELO, state: estado, questions: preguntas }),
@@ -126,3 +150,108 @@ export const NOTIFICACIONES_EJEMPLO: (DatosNotificacion & { esperado: Importanci
   { app: "Microsoft Edge", titulo: "Novedades de Edge", texto: "Descubre las nuevas funciones de la barra lateral", esperado: "ruido" },
   { app: "OneDrive", titulo: "Todo al día", texto: "Tus archivos están sincronizados", esperado: "ruido" },
 ];
+
+// ---------- Carácter de la canción (para el baile) ----------
+
+export type Estilo = "rock" | "pop" | "electronica" | "balada" | "tranquila" | "fiesta";
+
+/** Lo que se le cuenta a Jev de la canción: título y artista, y los números del ritmo (nunca el audio). */
+export interface DatosCancion {
+  titulo: string;
+  artista: string;
+  /** Pulsos por minuto, o null si aún no se sabe */
+  ppm: number | null;
+  /** Lo intensa que es esta parte (0 a 1), o null */
+  intensidad: number | null;
+}
+
+/**
+ * Cómo es la canción: el tono y la energía en dos escalas (de 0 a 4, con decimales: si Jev duda,
+ * quedan en medio, así que nunca exageran) y el género de baile.
+ */
+export interface Caracter {
+  /** 0 muy triste · 1 algo triste · 2 neutra o agridulce · 3 alegre · 4 muy alegre */
+  tono: number;
+  /** 0 para escuchar quieto · 1 para mecerse · 2 para moverse un poco · 3 para bailar · 4 para saltar */
+  energia: number;
+  estilo: Estilo;
+  /** Confianza de cada respuesta (0 a 1) */
+  confianzaTono: number;
+  confianzaEnergia: number;
+  confianzaEstilo: number;
+}
+
+/** Los niveles de las dos escalas (probadas con canciones reales: mejor que elegir un ánimo cerrado,
+ * donde la probabilidad se repartía entre ánimos parecidos como triste y nostálgica). */
+const TONOS = ["Muy triste: dolor, desamor, pérdida", "Algo triste o melancólica", "Neutra o agridulce", "Alegre o positiva", "Muy alegre, eufórica"];
+const ENERGIAS = ["Muy calmada, para escuchar quieto", "Tranquila, para mecerse", "Media, para moverse un poco", "Movida, para bailar", "Muy intensa, para saltar"];
+
+const ESTILOS: Record<Estilo, string> = {
+  rock: "Rock o metal: cabecear marcando el pulso",
+  pop: "Pop bailable: rebotar y dar pasos a los lados",
+  electronica: "Electrónica o dance: botar al compás",
+  balada: "Balada lenta: mecerse despacio, como flotando",
+  tranquila: "Acústica, chill o jazz: balancearse suave",
+  fiesta: "Fiesta, latina o reguetón: moverse de lado a lado y dar vueltas",
+};
+
+/** Lo que se añade al título y no dice nada de la canción («- En Vivo en…», «- Remastered», «(feat. …)»). */
+const COLETILLAS = [
+  /\s*[-–—]\s*(en vivo|live|directo|remaster(ed|izad[oa])?|\d{4} remaster|versi[oó]n|version|acoustic|ac[uú]stic[oa]|radio edit|edit|remix|mix|single|deluxe|bonus|mono|stereo)\b.*$/i,
+  /\s*[([](feat\.?|ft\.?|con|with|live|en vivo|directo|remaster[^)\]]*|versi[oó]n[^)\]]*|version[^)\]]*)[^)\]]*[)\]]/gi,
+];
+const EN_VIVO = /\b(en vivo|live|directo|concierto|unplugged)\b/i;
+
+/** El título sin coletillas, y si es una versión en directo. */
+export function limpiarTitulo(titulo: string): { titulo: string; enVivo: boolean } {
+  let limpio = titulo;
+  for (const r of COLETILLAS) limpio = limpio.replace(r, "");
+  limpio = limpio.trim();
+  return { titulo: limpio || titulo, enVivo: EN_VIVO.test(titulo) };
+}
+
+/**
+ * Pregunta a Jev, en dos consultas a la vez, el tono y la energía de la canción (solo con el
+ * título limpio y el artista: el volumen y el tempo de un directo no dicen si la letra es triste)
+ * y qué baile le va (con todo: título, artista, tempo e intensidad).
+ */
+export async function caracterCancion(clave: string, c: DatosCancion): Promise<Caracter> {
+  const { titulo, enVivo } = limpiarTitulo(c.titulo);
+  const parte = c.intensidad === null ? "desconocida" : c.intensidad < 0.35 ? "tranquila" : c.intensidad < 0.7 ? "media" : "intensa";
+  const [emocion, baile] = await Promise.all([
+    preguntarJev(
+      clave,
+      { cancion: titulo, artista: c.artista },
+      {
+        tono: {
+          type: "score",
+          instructions: "Qué tono emocional tiene esta canción por su letra y su tema (no por su volumen ni su ritmo)",
+          criteria: TONOS,
+        },
+        energia: { type: "score", instructions: "Cuánta energía tiene esta canción para bailar", criteria: ENERGIAS },
+      },
+    ),
+    preguntarJev(
+      clave,
+      {
+        cancion: titulo,
+        artista: c.artista,
+        version: enVivo ? "en vivo (el público y el volumen del directo no cambian el estilo)" : "de estudio",
+        tempo: c.ppm === null ? "desconocido" : `${c.ppm} pulsos por minuto`,
+        parte_de_la_cancion: parte,
+      },
+      { estilo: { type: "choice", instructions: "Qué género musical y forma de bailar le va a esta canción", criteria: ESTILOS } },
+    ),
+  ]);
+  const { tono, energia } = emocion.respuestas;
+  const e = baile.respuestas.estilo;
+  const estilo = (e.choice in ESTILOS ? e.choice : "pop") as Estilo;
+  return {
+    tono: tono.score,
+    energia: energia.score,
+    estilo,
+    confianzaTono: tono.confidence,
+    confianzaEnergia: energia.confidence,
+    confianzaEstilo: e.confidence,
+  };
+}

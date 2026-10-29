@@ -48,6 +48,17 @@ const PAUSA = {
   postura: { titulo: "Pausa de postura", boton: "Estirar ahora" },
   vista: { titulo: "Pausa de vista", boton: "Descansar la vista" },
 } as const;
+/** Cómo se dicen el tono, la energía (escalas de 0 a 4) y el estilo de la canción (Jev). */
+const nombreTono = (t: number) => (t < 1 ? "muy triste" : t < 1.75 ? "triste" : t < 2.5 ? "neutra" : t < 3.25 ? "alegre" : "muy alegre");
+const nombreEnergia = (e: number) => (e < 1 ? "muy calmada" : e < 1.75 ? "tranquila" : e < 2.5 ? "media" : e < 3.25 ? "movida" : "muy intensa");
+const NOMBRE_ESTILO: Record<string, string> = {
+  rock: "rockero",
+  pop: "pop",
+  electronica: "electrónico",
+  balada: "de balada",
+  tranquila: "tranquilo",
+  fiesta: "de fiesta",
+};
 /** Cada cuánto pasan los datos de las tarjetas carrusel del Inicio. */
 const CARRUSEL_MS = 4000;
 /** Lo que dura el fundido al pasar de un dato a otro. */
@@ -392,13 +403,22 @@ function pintarMusica(e: EstadoPanel): void {
   // Mientras se arrastra, la barra la mueve el ratón
   if (!buscando) pintarPosicion(m.duracionMs > 0 ? m.posicion / m.duracionMs : 0, m.posicion);
   fijarHtml($(document, ".mg-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
+  // Lo que dice Jev de la canción (ánimo y estilo de baile)
+  const c = e.caracter;
+  const caracter = $(document, ".mg-caracter");
+  caracter.hidden = !c;
+  if (c) {
+    const coma = (n: number) => n.toFixed(1).replace(".", ",");
+    const estilo = c.estilo ? `baile ${NOMBRE_ESTILO[c.estilo] ?? c.estilo} (${Math.round(c.confianzaEstilo * 100)} %)` : "baile según el ritmo";
+    caracter.textContent = `Jev: ${nombreTono(c.tono)} (${coma(c.tono)}) · energía ${nombreEnergia(c.energia)} (${coma(c.energia)}) · ${estilo}`;
+  }
   const r = e.ritmo;
   const ritmo = $(document, ".mg-ritmo");
   ritmo.hidden = !r;
   if (r) {
     const claro = r.confianza >= 0.6 ? "claro" : r.confianza >= 0.3 ? "regular" : "dudoso";
     const parte = r.pausa ? "en pausa" : `${r.partes} ${r.partes === 1 ? "parte" : "partes"}`;
-    ritmo.textContent = `${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · ${r.golpes} golpes · ${parte}`;
+    ritmo.textContent = `${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · ${parte} · paso: ${r.paso}`;
   }
 }
 

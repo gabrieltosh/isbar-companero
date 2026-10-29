@@ -30,6 +30,7 @@ import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoP
 import { resumenClima } from "./clima";
 import { pausarGlobos } from "./globos";
 import { minutosNoMolestar } from "./noMolestar";
+import { caracterActual } from "./caracter";
 import { resumenRitmo } from "./ritmo";
 import { responder, responderMusica } from "./respuestas";
 
@@ -58,6 +59,7 @@ function foto(): EstadoPanel {
     },
     musica: info ? { ...info, posicion: posicionMusica() } : null,
     ritmo: resumenRitmo(),
+    caracter: caracterActual(),
     clima: resumenClima(),
     noMolestar: minutosNoMolestar(),
   };

@@ -27,6 +27,7 @@ import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } fr
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
 import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
+import { caracterActual, iniciarCaracter } from "./caracter";
 import { dibujarTiempo } from "./tiempo";
 import { iniciarRespuestas } from "./respuestas";
 import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
@@ -232,6 +233,7 @@ function fotograma(ahora: number): void {
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
           vidaNota: VIDA_NOTA,
+          tono: caracterActual()?.tono,
         }
       : undefined;
 
@@ -882,6 +884,7 @@ gesto("saludo", 2600);
 iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
+iniciarCaracter();
 iniciarSistema();
 void iniciarClima();
 iniciarRespuestas();

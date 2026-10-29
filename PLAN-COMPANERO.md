@@ -31,7 +31,8 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
    dato clave que llevan a su pestaña; Recursos (CPU, memoria, batería) y Tiempo (ahora, hoy,
    lluvia) pasan como carrusel cada 4 s. El agua ya no está en el panel (globo y bandeja).
 5. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
-6. **Modo inteligente con Jev** (en curso): conexión y filtro de notificaciones hechos; ver
+6. **Modo inteligente con Jev** (en curso): conexión, filtro de notificaciones y carácter del baile
+   hechos; ver
    «Hacerlo más inteligente».
 
 | Fase | Estado |
@@ -399,9 +400,29 @@ Hoy las reacciones salen de reglas fijas. Jev decidiría lo que con reglas queda
 4. ~~Filtrar notificaciones~~ ✅: urgente (pasa delante y espera hasta que respondas), normal o
    ruido (no sale en globo). Con poca confianza, error o sin respuesta en 4 s, es normal. Cada
    decisión queda en la consola para compararla.
-5. Saber qué estás haciendo (reunión, código, vídeo…) para ajustar cuánto habla.
-6. Experimento «qué hacer ahora».
-7. Experimento «carácter del baile».
+5. ~~Carácter del baile~~ ✅ (`caracter.ts`): a los 6 s de empezar cada canción (y en las partes
+   nuevas, como mucho cada 30 s) dos consultas a la vez:
+   - **Tono y energía en dos escalas de 0 a 4** (de muy triste a muy alegre; de quieta a para
+     saltar), solo con el título limpio («Traicionero», sin «- En Vivo en…», «- Remastered»…) y el
+     artista, para que el volumen de un directo no confunda. Probado con canciones reales: mejor
+     que elegir un ánimo cerrado (la probabilidad se repartía entre ánimos parecidos, y con más
+     ánimos la confianza media bajaba del 71 % al 57 %). Si Jev duda, las escalas quedan en medio
+     y no exageran, así que se usan siempre.
+   - **Género de baile** (rock, pop, electrónica, balada, tranquila, fiesta) con el tempo y la
+     intensidad; se usa si su confianza llega al 45 %.
+   - El género decide los pasos: cada paso dice a qué géneros pertenece y solo se sortean esos.
+     Pasos propios: headbang y guitarra (rock), bote y robot (electrónica), hombros (pop), abrazo
+     (balada), chasquido en el 2 y el 4 (tranquila), cadera (fiesta), y para canciones lentas o
+     tristes, encendedor (balanceo amplio con los ojos cerrados) y cabeceo lento.
+   - La energía decide lo animada que es (60 % Jev, 40 % el ritmo medido), la amplitud (×0,75 a
+     ×1,35, por la del género) y si salta (desde 2,5). Con poca energía (< 1,5), solo pasos lentos.
+   - El tono triste (< 1,5) frena: no salta ni celebra con saltos aunque tenga energía, y la
+     amplitud se queda en ×1 como mucho («Traicionero»: tono 0,4, energía 2,4, rock → guitarra,
+     cabeceo, headbang, metrónomo, sin saltos). La cara va de cejas caídas y boca hacia abajo
+     (triste) a una sonrisa más amplia (muy alegre), poco a poco.
+   - En el panel → Música se ve qué dijo Jev y el paso que está bailando.
+6. Saber qué estás haciendo (reunión, código, vídeo…) para ajustar cuánto habla.
+7. Experimento «qué hacer ahora».
 
 ## Para más adelante
 - IA opcional para conversar (clave de API propia del usuario; se avisa de que el texto sale del PC).

@@ -539,7 +539,15 @@ svg {
 .progreso .barra i {
   background: var(--texto);
 }
-/* Lo que reconoce el compañero de la canción (pulsos por minuto y lo claro que está) */
+/* Lo que reconoce el compañero de la canción: ánimo y estilo (Jev), y pulsos por minuto */
+.mg-caracter {
+  color: var(--texto);
+  font-size: 12px;
+}
+.mg-caracter[hidden],
+.mg-ritmo[hidden] {
+  display: none;
+}
 .mg-ritmo {
   color: var(--suave);
   font-size: 11.5px;

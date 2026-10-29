@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cambiosMusica, musicaSonando } from "../estado/musica";
 import { crearSenal } from "../estado/senal";
-import { celebrarVuelta, nuevaParte } from "./baile";
+import { celebrarVuelta, nuevaParte, pasoActual } from "./baile";
 
 /** Sin mensajes nuevos en este tiempo, se considera que no hay audio. */
 const SIN_AUDIO_MS = 500;
@@ -60,6 +60,8 @@ export const ritmo = {
 
 /** Hubo un golpe en la música. */
 export const golpe = crearSenal();
+/** Empieza una parte nueva de la canción (estribillo, puente…). */
+export const parteNueva = crearSenal();
 
 let ultimoNivel = 0;
 let rapida = 0;
@@ -86,9 +88,9 @@ export function pulsoAhora(): number {
 }
 
 /** Pulsos por minuto y aciertos, para ver en el panel cómo va el reconocimiento. */
-export function resumenRitmo(): { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null {
+export function resumenRitmo(): { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string } | null {
   if (!hayAudio()) return null;
-  return { ppm: Math.round(60_000 / ritmo.intervalo), confianza: ritmo.confianza, golpes, partes, pausa: ritmo.pausa };
+  return { ppm: Math.round(60_000 / ritmo.intervalo), confianza: ritmo.confianza, golpes, partes, pausa: ritmo.pausa, paso: pasoActual() };
 }
 
 /** Saca una notita por un lado (como mucho MAX_NOTAS a la vez). */
@@ -126,7 +128,10 @@ function procesar(e: EstadoAudio): void {
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
-  if (e.seccion === "cambio") nuevaParte();
+  if (e.seccion === "cambio") {
+    nuevaParte();
+    parteNueva.emitir();
+  }
   if (e.seccion === "vuelta") {
     // Vuelve la música: celebra con un latido fuerte y notitas por los dos lados
     celebrarVuelta();

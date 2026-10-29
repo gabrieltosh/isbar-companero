@@ -82,6 +82,8 @@ export interface MusicaPose {
   notas: { nace: number; lado: number }[];
   /** Lo que tarda cada notita en subir y desvanecerse (ms) */
   vidaNota: number;
+  /** Tono de la canción según Jev (0 muy triste … 4 muy alegre): cambia la cara al bailar, si se sabe */
+  tono?: number;
 }
 
 /** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
@@ -250,7 +252,15 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
       }
       const a = 1 + limitar(musica.energia, 0, 1) * 4.5;
       const cantando = boca(9 + a * 0.4, -a, a, 0, 0, 3);
-      const sonriendo = boca(13, 4, 4.5, 0, 0, 2);
+      let sonriendo = boca(13, 4, 4.5, 0, 0, 2);
+      // El tono de la canción (Jev), poco a poco: cuanto más triste, más caídas las cejas y menos
+      // sonrisa (hasta una boca hacia abajo); muy alegre, una sonrisa más amplia
+      if (musica.tono !== undefined) {
+        const tristeza = limitar((1.5 - musica.tono) / 1.5, 0, 1);
+        const alegria = limitar((musica.tono - 3) / 1, 0, 1);
+        o = { ...o, giro: o.giro - 14 * tristeza, dy: o.dy + tristeza };
+        sonriendo = mezclarObj(mezclarObj(sonriendo, boca(12, -2.5, -2.5, 0, 0, 3), tristeza), boca(16, 5, 6, 0, 0, 2), alegria);
+      }
       return iguales(o, mezclarObj(sonriendo, cantando, limitar(musica.canta, 0, 1)));
     }
     case "silba":

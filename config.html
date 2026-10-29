@@ -39,7 +39,7 @@
       <section>
         <h2>Inteligencia (Jev)</h2>
         <p class="ayuda">Con <b>Jev</b> (TypeSafe), el compañero decide mejor algunas cosas, como qué notificaciones son urgentes y cuáles son ruido. Hace falta tu clave de API de <b>typesafe.ai</b> y conexión a internet; sin ella, todo sigue funcionando como siempre. Cuesta muy poco: se paga por lo que se envía.</p>
-        <p class="ayuda"><b>Qué sale del PC:</b> con «Filtrar notificaciones», la app, el título y el texto de cada notificación. Nada más, y solo con Jev activado.</p>
+        <p class="ayuda"><b>Qué sale del PC:</b> con «Filtrar notificaciones», la app, el título y el texto de cada notificación; con «Estilo del baile», el título y el artista de la canción y su tempo (nunca el audio). Nada más, y solo con Jev activado.</p>
         <label>Usar Jev <input type="checkbox" class="interruptor" data-campo="jev.activo" /></label>
         <label>Clave de API <input type="password" id="jev-clave" placeholder="Pega aquí tu clave" autocomplete="off" spellcheck="false" /></label>
         <label>Conexión <span><output id="jev-estado"></output> <button type="button" class="probar" id="jev-probar">Probar</button></span></label>
@@ -48,6 +48,8 @@
         <label>Probar el filtro <button type="button" class="probar" id="jev-ejemplos-probar">Probar con ejemplos</button></label>
         <p class="ayuda">Manda a Jev unas notificaciones inventadas, enseña aquí qué decide con cada una y se las pasa al compañero para que veas los globos.</p>
         <ul class="jev-ejemplos" id="jev-ejemplos" hidden></ul>
+        <label>Estilo del baile <input type="checkbox" class="interruptor" data-campo="jev.baile" /></label>
+        <p class="ayuda">Con cada canción, Jev dice su tono (de triste a alegre), su energía (de quieta a para saltar) y qué baile le va (rock, balada, electrónica…): el compañero elige los pasos, cuánto se mueve y la cara según eso. Lo verás en la pestaña Música del panel.</p>
       </section>
 
       <section>

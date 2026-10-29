@@ -77,9 +77,11 @@ export interface ConfigJev {
   clave: string;
   /** Decide si cada notificación es urgente, normal o ruido (envía la app, el título y el texto) */
   notificaciones: boolean;
+  /** Elige el ánimo y el estilo del baile de cada canción (envía título, artista y tempo) */
+  baile: boolean;
 }
 
-export const JEV_POR_DEFECTO: ConfigJev = { activo: false, clave: "", notificaciones: true };
+export const JEV_POR_DEFECTO: ConfigJev = { activo: false, clave: "", notificaciones: true, baile: true };
 
 /** Sonido común de los avisos (pausas activas y recordatorio de agua). */
 export interface ConfigSonido {

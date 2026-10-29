@@ -23,8 +23,10 @@ export interface EstadoPanel {
     tipos: { tipo: TipoPausa; nombre: string; activa: boolean; cuando: string }[];
   };
   musica: (InfoMedia & { posicion: number }) | null;
+  /** Cómo es la canción según Jev: tono y energía (0 a 4) y estilo (null si no está seguro); null si no se sabe */
+  caracter: { tono: number; energia: number; estilo: string | null; confianzaEstilo: number } | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
-  ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null;
+  ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string } | null;
   /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
   clima: {
     temperatura: number;
