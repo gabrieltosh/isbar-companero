@@ -26,6 +26,7 @@ la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan»
 3. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
    gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
 4. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
+5. **Modo inteligente con Jev** (opcional, cuando haya acceso): ver «Hacerlo más inteligente».
 
 | Fase | Estado |
 |---|---|
@@ -274,6 +275,52 @@ funciona desde Windows 10 2004).
 
 Notas: el análisis seguirá activo solo mientras suena música; una FFT de 1024 muestras cada
 ~20 ms gasta muy poco. Nada del audio se guarda ni sale del equipo.
+
+## Hacerlo más inteligente: Jev (TypeSafe)
+
+[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) es un «System One model»:
+recibe un estado (texto o datos) y devuelve **una opción de una lista definida de antemano, con su
+probabilidad**. No escribe texto. Lo que dice el artículo: 70–500 ms por consulta, ~0,04 $ por
+millón de tokens de entrada (la salida no se cobra), hasta 255 opciones por decisión. Está **en la
+nube** y en **acceso anticipado** (lista de espera); el artículo no dice si entiende español.
+Documentación: https://docs.typesafe.ai/introduction
+
+### Para qué sirve aquí
+Hoy las reacciones salen de reglas fijas. Jev decidiría lo que con reglas queda torpe:
+
+1. **Qué hacer ahora** (primer experimento). Cada cierto tiempo o al pasar algo, se le manda un
+   resumen del momento (hora, app en primer plano, si escribes, música, Pomodoro, batería,
+   últimas interacciones) y devuelve qué expresión poner, si es buen momento para interrumpir y
+   qué tipo de comentario hacer. Si su probabilidad es baja, no se hace nada.
+2. **Carácter del baile** (segundo experimento). Una consulta por canción y otra por cada parte
+   nueva, con título, artista y los números del análisis (tempo, intensidad, bandas; nunca el
+   audio): ánimo (alegre, triste, épica, relajada, romántica, enérgica, oscura…), estilo de baile
+   (cabeceo de rock, balanceo, saltos de electrónica, mecerse de balada…), género y cuándo hacer
+   algo especial. Sus probabilidades guiarían el sorteo de pasos (`baile.ts`) y la cara (triste
+   con una canción triste, en vez de sonreír siempre). El pulso y los golpes **siguen siendo
+   locales** (`ritmo.rs`): Jev es demasiado lento para seguir el ritmo.
+3. **Filtrar notificaciones**: urgente, normal o ruido; mostrar ya, esperar a que acabe el
+   Pomodoro o callar (un «No molestar» inteligente).
+4. **Saber qué estás haciendo** (programando, en una reunión, viendo un vídeo, jugando) para
+   ajustar cuánto habla y se mueve (hoy, reglas en `entorno.ts`).
+5. **Asistente**: clasificar lo que le escribes (recordatorio, Pomodoro, agua, clima, charla). Las
+   horas y el texto del recordatorio los saca un analizador propio; para charlar haría falta un
+   modelo que escriba.
+
+### Reglas
+- **Opcional y apagado por defecto**, con la clave propia del usuario y aviso claro de lo que sale
+  del PC (títulos de ventanas, apps, canción y artista; quizá texto de notificaciones).
+- **Sin internet o sin acceso, todo sigue igual** con las reglas actuales: Jev es una capa encima.
+- Nunca para la animación en tiempo real; solo para decisiones (una consulta cada poco).
+- Llamarlo desde Rust (posible dependencia nueva para HTTP, a explicar antes) o desde el frontend.
+- Comparar sus decisiones con las reglas antes de darle el control.
+
+### Pasos
+1. Pedir acceso en typesafe.ai y conseguir una clave (lo hace el usuario).
+2. Leer la documentación de la API: formato de las consultas, límites y si admite español.
+3. Conexión con Jev y ajuste en Configuración (clave y aviso de privacidad).
+4. Experimento «qué hacer ahora».
+5. Experimento «carácter del baile».
 
 ## Para más adelante
 - IA opcional para conversar (clave de API propia del usuario; se avisa de que el texto sale del PC).
