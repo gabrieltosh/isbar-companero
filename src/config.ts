@@ -105,6 +105,12 @@ selectorCompanero("#companero-tamano", TAMANOS_COMPANERO, String(grupos.companer
   grupos.companero.tamano = Number(v);
 });
 
+// ---------- Notificaciones de Windows ----------
+
+$(document, "#ajustes-banners").addEventListener("click", () => {
+  invoke("abrir_ajustes_banners").catch(console.error);
+});
+
 // ---------- Inicio con Windows ----------
 // Rust decide cómo: tarea de inicio del paquete (Microsoft Store) o clave Run (sin paquete)
 

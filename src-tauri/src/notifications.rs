@@ -279,6 +279,16 @@ pub async fn eliminar_notificaciones(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Abre Configuración > Sistema > Notificaciones, donde se activa "No molestar" (o el
+/// Asistente de concentración en Windows 10) o se quitan los banners de cada app, para que
+/// las notificaciones solo se vean en los globos del compañero.
+#[tauri::command]
+pub fn abrir_ajustes_banners(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url("ms-settings:notifications", None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// Abre Configuración > Privacidad > Notificaciones para conceder el permiso.
 #[tauri::command]
 pub fn abrir_ajustes_notificaciones(app: AppHandle) -> Result<(), String> {

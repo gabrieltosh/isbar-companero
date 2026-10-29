@@ -39,6 +39,7 @@ pub fn run() {
         media::media_next,
         media::media_previous,
         notifications::abrir_ajustes_notificaciones,
+        notifications::abrir_ajustes_banners,
         notifications::contar_notificaciones,
         notifications::abrir_centro_notificaciones,
         notifications::listar_notificaciones,

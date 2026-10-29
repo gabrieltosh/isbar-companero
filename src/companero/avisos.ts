@@ -34,6 +34,7 @@ import {
 } from "../estado/pausas";
 import { alternarPomodoro, duracion, estadoPomodoro, iniciarPomodoro, pomodoroTerminado } from "../estado/pomodoro";
 import { iniciarSonido } from "../sonido";
+import { guardar, leer } from "../store";
 import type { Expresion } from "./cara";
 import { actualizar, avisar, cerrar, globoActual, iniciarGlobos } from "./globos";
 import { gesto } from "./vida";
@@ -56,6 +57,26 @@ interface Notificacion {
 }
 
 // ---------- Notificaciones de Windows ----------
+
+/** Tras la primera notificación, se sugiere una vez quitar los banners de Windows (para no verla dos veces). */
+async function sugerirQuitarBanners(): Promise<void> {
+  if (await leer("sugerenciaBanners", false)) return;
+  void guardar("sugerenciaBanners", true);
+  avisar({
+    origen: "isbar",
+    titulo: "¿Te las enseño solo yo?",
+    texto: "Activa «No molestar» en Windows y no verás cada notificación dos veces. Yo las seguiré viendo.",
+    duracion: 0,
+    gesto: "guino",
+    acciones: [
+      { id: "ajustes", texto: "Abrir ajustes", principal: true },
+      { id: "no", texto: "No, gracias" },
+    ],
+    alAccion: (accion) => {
+      if (accion === "ajustes") invoke("abrir_ajustes_banners").catch(console.error);
+    },
+  });
+}
 
 function avisarNotificacion(n: Notificacion): void {
   const abrir = () => invoke("abrir_notificacion", { id: n.id }).catch(console.error);
@@ -84,6 +105,7 @@ function iniciarNotificaciones(): void {
   listen<Notificacion>("notification-new", ({ payload }) => {
     if (musicaSonando() && REPRODUCTORES.test(payload.app)) return;
     avisarNotificacion(payload);
+    void sugerirQuitarBanners();
   }).catch(console.error);
 
   // Sin permiso: se avisa una vez con un botón para darlo. Sin paquete ("error"), en silencio
