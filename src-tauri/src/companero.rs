@@ -57,6 +57,20 @@ struct Soltado {
     x: i32,
     y: i32,
     borde: i8,
+    /// La ventana que queda debajo al soltarlo (para reaccionar a lo que "ve")
+    debajo: Option<Debajo>,
+}
+
+#[cfg(target_os = "windows")]
+use crate::debajo::{ventana_debajo, Debajo};
+
+/// Fuera de Windows aún no se sabe qué hay debajo.
+#[cfg(not(target_os = "windows"))]
+#[derive(Serialize, Clone)]
+struct Debajo;
+#[cfg(not(target_os = "windows"))]
+fn ventana_debajo(_x: i32, _y: i32) -> Option<Debajo> {
+    None
 }
 
 /// Crea la ventana (al arrancar). Nace fuera de la pantalla y oculta para Windows (pero visible
@@ -245,7 +259,7 @@ pub fn fijar_tamano_companero(app: AppHandle, escala: f64) -> Result<(), String>
         .map_err(|e| e.to_string())?;
     let (x, y, borde) = destino(&ventana, pos.x - corrimiento, pos.y - corrimiento, true);
     ventana.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    let _ = ventana.emit("companero-soltado", Soltado { x, y, borde });
+    let _ = ventana.emit("companero-soltado", Soltado { x, y, borde, debajo: None });
     Ok(())
 }
 
@@ -263,7 +277,10 @@ fn soltar(ventana: &WebviewWindow, permitir_borde: bool) {
     };
     let (x, y, borde) = destino(ventana, pos.x, pos.y, permitir_borde);
     deslizar(ventana, (x, y));
-    let _ = ventana.emit("companero-soltado", Soltado { x, y, borde });
+    // Lo que queda debajo del centro del compañero
+    let lado = ventana.outer_size().map(|t| t.width as i32).unwrap_or(0);
+    let debajo = ventana_debajo(x + lado / 2, y + lado / 2);
+    let _ = ventana.emit("companero-soltado", Soltado { x, y, borde, debajo });
 }
 
 /// El botón principal del ratón sigue pulsado (respeta el cambio de botones para zurdos).

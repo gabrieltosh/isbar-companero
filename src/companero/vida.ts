@@ -23,7 +23,7 @@ const SORPRESA_AL_COGER = 500;
 /** Usando el PC sin parar este tiempo, empieza a bostezar de vez en cuando. */
 const SESION_LARGA = 50 * 60_000;
 
-export type Rutina = "mira" | "silba" | "estira" | "teclado" | null;
+export type Rutina = "mira" | "silba" | "estira" | "teclado" | "pelota" | "baila" | "lados" | null;
 
 export interface Contexto {
   ahora: number;
@@ -85,13 +85,24 @@ export function esDeNoche(fecha = new Date()): boolean {
 const azar = <T>(opciones: T[]): T => opciones[Math.floor(Math.random() * opciones.length)];
 const progresoDe = (m: Momento, ahora: number) => Math.min(1, (ahora - m.desde) / (m.hasta - m.desde));
 
+/** La cara que acompaña a cada rutina. */
+function expresionDeRutina(r: Rutina): Expresion {
+  if (r === "silba") return "silba";
+  if (r === "pelota") return "juega";
+  if (r === "baila") return "feliz";
+  return "normal";
+}
+
 function elegirRutina(tranquilo: boolean): Rutina {
   const r = Math.random();
   if (tranquilo) return r < 0.5 ? null : "mira";
-  if (r < 0.15) return null;
-  if (r < 0.4) return "mira";
-  if (r < 0.7) return "silba";
-  return "estira";
+  if (r < 0.1) return null;
+  if (r < 0.28) return "mira";
+  if (r < 0.43) return "silba";
+  if (r < 0.56) return "estira";
+  if (r < 0.7) return "lados";
+  if (r < 0.85) return "pelota";
+  return "baila";
 }
 
 /** Una ocurrencia mientras usas el PC. Si llevas mucho rato (o es de noche), a veces bosteza. */
@@ -100,7 +111,15 @@ function elegirOcurrencia(ctx: Contexto): Momento {
   type Opcion = [Expresion, Rutina];
   const opciones: Opcion[] = ctx.tranquilo
     ? [["normal", "mira"], ["pensativo", null]]
-    : [["normal", "mira"], ["silba", "silba"], ["normal", "estira"], ["pensativo", null]];
+    : [
+        ["normal", "mira"],
+        ["silba", "silba"],
+        ["normal", "estira"],
+        ["pensativo", null],
+        ["juega", "pelota"],
+        ["feliz", "baila"],
+        ["normal", "lados"],
+      ];
   if (cansado) opciones.push(["bostezo", null], ["bostezo", null]);
   const [expresion, r] = azar(opciones);
   return { expresion, rutina: r, desde: ctx.ahora, hasta: ctx.ahora + DURACION_OCURRENCIA };
@@ -137,7 +156,7 @@ export function decidir(ctx: Contexto): Decision {
       rutina = elegirRutina(ctx.tranquilo);
       cambioRutina = ctx.ahora + DURACION_RUTINA;
     }
-    return { expresion: rutina === "silba" ? "silba" : "normal", rutina, progreso: 0 };
+    return { expresion: expresionDeRutina(rutina), rutina, progreso: 0 };
   }
   rutina = null;
 

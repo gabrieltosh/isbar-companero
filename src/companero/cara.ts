@@ -27,6 +27,7 @@ export type Expresion =
   | "musica"
   | "notificacion"
   | "curioso"
+  | "juega"
   | "lupa"
   | "otea"
   | "asoma"
@@ -158,6 +159,9 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
     case "curioso":
       // Un ojo muy abierto y el otro entornado, como quien examina algo; boquita de lado
       return { izq: OJO_GRANDE, der: ojo(9.6, 2, 4, 10, 0, 1), boca: boca(6, -2.4, 2.4, 0, 3, 3) };
+    case "juega":
+      // Atento a la pelota, con una sonrisita
+      return iguales(ojo(9.8, 4.9, 4.4), boca(10, -1.6, 3.6, 0, 0, 3));
     case "lupa":
       // Examina con una lupa: el ojo de detrás del cristal se ve enorme
       return { izq: ojo(8.6, 3.6, 4.2, 0, 0, 1), der: ojo(13.4, 6.8, 6.8), boca: boca(7, -1, -1, 0, -2, 3) };
@@ -314,6 +318,13 @@ const nota = (x: number, y: number, k: number, c: string) =>
   `<path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" stroke-linejoin="round" fill="none"/>` +
   `<circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
 
+/** Dónde está la pelotita al jugar (bota sobre la cabeza, de un lado a otro). */
+export function pelota(t: number): { x: number; y: number; altura: number } {
+  const ciclo = t / 520;
+  const altura = Math.abs(Math.sin(ciclo * Math.PI));
+  return { x: 32 + Math.sin(ciclo * 0.5 * Math.PI) * 10, y: -1 - altura * 15, altura };
+}
+
 /** Lo que acompaña a una expresión y no forma parte de los ojos ni la boca. */
 export function dibujarExtras(expresion: Expresion, t: number, progreso: number, p: Pose, c: string): string {
   switch (expresion) {
@@ -355,6 +366,11 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
         `<path d="${q}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none"/>` +
         `<circle cx="0" cy="5" r="1.4" ${conBorde(c)}/></g>`
       );
+    }
+    case "juega": {
+      // Una pelotita que bota sobre su cabeza
+      const { x, y } = pelota(t);
+      return `<circle cx="${n(x)}" cy="${n(y)}" r="4" ${conBorde("#FF8A3D")}/>`;
     }
     case "lupa": {
       // La lupa delante del ojo derecho, siguiendo la mirada

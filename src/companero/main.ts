@@ -8,6 +8,7 @@ import { $ } from "../util";
 import {
   bostezo,
   dibujarCara,
+  pelota,
   dibujarExtras,
   mezclar,
   rasgosDe,
@@ -22,6 +23,7 @@ import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
+import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -66,6 +68,8 @@ interface PosGuardada {
 interface Soltado extends PosGuardada {
   /** -1 escondido a la izquierda, 1 a la derecha, 0 libre */
   borde: number;
+  /** La ventana que queda debajo (programa y título), si se sabe */
+  debajo: Debajo | null;
 }
 
 const companero = $(document, "#companero");
@@ -120,7 +124,20 @@ const centro = () => (MARGEN + LADO / 2) * config.tamano;
 
 // ---------- Animación ----------
 
+/** Dormido o cansado se mueve despacio: basta con menos fotogramas por segundo (gasta menos). */
+const MS_DORMIDO = 1000 / 15;
+const MS_CANSADO = 1000 / 30;
+let ultimoDibujo = 0;
+let dibujoCara = "";
+
 function fotograma(ahora: number): void {
+  const lento = !arrastrando && !encima && !morph;
+  const espera = !lento ? 0 : expresionActual === "dormido" ? MS_DORMIDO : expresionActual === "cansado" ? MS_CANSADO : 0;
+  if (ahora - ultimoDibujo < espera - 2) {
+    requestAnimationFrame(fotograma);
+    return;
+  }
+  ultimoDibujo = ahora;
   const noche = esDeNoche();
   const { expresion, rutina, progreso } = decidir({
     ahora,
@@ -149,9 +166,17 @@ function fotograma(ahora: number): void {
   let objetivoBaile = SIN_BAILE;
   let ojosObjetivo: OjosBaile = "felices";
   if (conRitmo) {
-    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad);
+    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
+  } else if (expresion === "feliz" && rutina === "baila") {
+    // Baila solo, sin música, a su aire
+    objetivoBaile = bailar(ahora, ahora / 560, 0.5, 0.35, 560).mov;
+  } else if (rutina === "lados" && expresion === "normal") {
+    // Estira hacia un lado y hacia el otro, despacio
+    const k = Math.sin(ahora / 1100);
+    objetivoBaile = { ...SIN_BAILE, rot: k * 11, x: k * 2, giroCara: k * 6, sy: 1 + Math.abs(k) * 0.04 };
+    pararBaile();
   } else {
     pararBaile();
   }
@@ -186,6 +211,11 @@ function fotograma(ahora: number): void {
     // Mira hacia donde lo llevas
     miraX = Math.max(-4, Math.min(4, paseo.vx * 3));
     miraY = Math.max(-3.5, Math.min(3.5, paseo.vy * 3));
+  } else if (expresion === "juega") {
+    // Sigue la pelota con la mirada
+    const b = pelota(ahora);
+    miraX = (b.x - 32) / 3;
+    miraY = -1.5 - b.altura * 2.5;
   } else if (curioseoActual && expresion === curioseoActual.expresion) {
     // Examina su nuevo sitio: mira a un lado y a otro, inclinándose hacia donde mira
     const miradas = curioseoActual.miradas;
@@ -260,6 +290,12 @@ function fotograma(ahora: number): void {
         salto = -Math.max(0, Math.sin(progreso * curioseoActual.miradas.length * Math.PI * 2)) * 1.2 * movimiento;
       }
       break;
+    case "juega": {
+      // Cabezazo a la pelota cada vez que baja
+      const b = pelota(ahora);
+      salto = -Math.max(0, 1 - b.altura * 6) * 2.5 * movimiento;
+      break;
+    }
     case "frustrado":
       // Se desinfla un poco
       giro -= 5;
@@ -332,7 +368,12 @@ function fotograma(ahora: number): void {
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
-  cara.innerHTML = anilloPomodoro() + dibujarConMorph(ahora);
+  // Solo se reescribe la cara si ha cambiado algo
+  const dibujo = anilloPomodoro() + dibujarConMorph(ahora);
+  if (dibujo !== dibujoCara) {
+    cara.innerHTML = dibujo;
+    dibujoCara = dibujo;
+  }
   requestAnimationFrame(fotograma);
 }
 
@@ -390,6 +431,15 @@ function parpadear(): void {
 let tArrastre = 0;
 let pulsado = false;
 let clics: number[] = [];
+/** Reacciones al doble clic (no repite la anterior). */
+const DOBLE_CLIC: [Expresion, number][] = [
+  ["risa", 1500],
+  ["celebra", 1700],
+  ["guino", DURACION_GUINO],
+  ["sorpresa", 900],
+  ["impresionado", 1500],
+];
+let ultimoDobleClic = -1;
 let tPanel = 0;
 
 companero.addEventListener("pointerdown", (e) => {
@@ -426,18 +476,22 @@ window.addEventListener("pointerup", () => {
     invoke("salir_del_borde").catch(console.error);
     return;
   }
-  // Un clic: abre o cierra el panel (con un guiño). Dos seguidos: risa. Muchos: se enoja.
+  // Un clic: abre o cierra el panel (con un guiño). Dos seguidos: risa, celebra, guiño o susto
+  // (cada vez uno). Muchos: se enoja o se frustra.
   // El panel espera un momento por si llega un segundo clic
   const ahora = performance.now();
   clics = clics.filter((c) => ahora - c < RAFAGA_MS);
   clics.push(ahora);
   window.clearTimeout(tPanel);
   if (clics.length >= 4) {
-    gesto("enojado", 1800);
+    gesto(Math.random() < 0.6 ? "enojado" : "frustrado", 1800);
     clics = [];
     invoke("cerrar_panel").catch(console.error);
   } else if (clics.length >= 2 && ahora - clics[clics.length - 2] < DOBLE_CLIC_MS) {
-    gesto("risa", 1500);
+    let i = Math.floor(Math.random() * DOBLE_CLIC.length);
+    if (i === ultimoDobleClic) i = (i + 1) % DOBLE_CLIC.length;
+    ultimoDobleClic = i;
+    gesto(...DOBLE_CLIC[i]);
   } else {
     tPanel = window.setTimeout(() => {
       invoke<boolean>("alternar_panel")
@@ -469,38 +523,37 @@ const CURIOSEOS: Curioseo[] = [
 ];
 /** Lo mínimo que hay que llevarlo para que curiosee al soltarlo (ms). */
 const MINIMO_PASEO_CURIOSEO = 350;
-const REACCIONES: [Expresion, number][] = [
-  ["impresionado", 2000],
-  ["sorpresa", 1600],
-  ["frustrado", 2200],
-  ["feliz", 1600],
-  ["pensativo", 2000],
-  ["risa", 1500],
-  ["triste", 1800],
-];
 let curioseo = 0;
-let ultimoCurioseo = -1;
-let ultimaReaccion = -1;
 /** Cómo está curioseando ahora (o null). */
 let curioseoActual: Curioseo | null = null;
+/** Al dejarlo en un sitio donde ya ha estado varias veces, a veces lo reconoce sin curiosear. */
+const RECONOCE_DESDE = 2;
+const RECONOCIMIENTOS: [Expresion, number][] = [
+  ["guino", DURACION_GUINO],
+  ["feliz", 1400],
+  ["silba", 2000],
+];
 
-/** Un índice al azar que no sea el de la última vez. */
-function otroAlAzar(total: number, ultimo: number): number {
-  const i = Math.floor(Math.random() * total);
-  return i === ultimo ? (i + 1) % total : i;
-}
-
-function curiosear(): void {
+/** Examina el sitio donde lo dejaste según lo que hay debajo, y reacciona a lo que "ve". */
+function curiosear(debajo: Debajo | null, x: number, y: number): void {
   const id = ++curioseo;
-  ultimoCurioseo = otroAlAzar(CURIOSEOS.length, ultimoCurioseo);
-  const forma = CURIOSEOS[ultimoCurioseo];
+  const visitas = visitar(x, y);
+  if (visitas >= RECONOCE_DESDE && Math.random() < 0.5) {
+    // "Ah, aquí otra vez"
+    const [expresion, ms] = RECONOCIMIENTOS[Math.floor(Math.random() * RECONOCIMIENTOS.length)];
+    curioseoActual = null;
+    gesto(expresion, ms);
+    return;
+  }
+  const entorno = entornoDe(debajo);
+  const elegida = curioseoPara(entorno);
+  const forma = CURIOSEOS.find((c) => c.expresion === elegida) ?? CURIOSEOS[0];
   curioseoActual = forma;
   gesto(forma.expresion, forma.ms);
   setTimeout(() => {
     // Si lo volviste a coger (u otra cosa lo interrumpió), no reacciona
     if (id !== curioseo || arrastrando || expresionActual !== forma.expresion) return;
-    ultimaReaccion = otroAlAzar(REACCIONES.length, ultimaReaccion);
-    const [expresion, ms] = REACCIONES[ultimaReaccion];
+    const [expresion, ms] = reaccionPara(entorno);
     gesto(expresion, ms);
   }, forma.ms);
 }
@@ -514,7 +567,7 @@ listen<Soltado>("companero-soltado", ({ payload }) => {
     const ahora = performance.now();
     if (paseo.sacudidas.filter((s) => ahora - s < 1500).length >= SACUDIDAS_MAREO) gesto("mareado", 2400);
     // Si no, tras un paseo, curiosea su nuevo sitio (no si está escondido en un borde)
-    else if (ahora - paseo.desde > MINIMO_PASEO_CURIOSEO && payload.borde === 0) curiosear();
+    else if (ahora - paseo.desde > MINIMO_PASEO_CURIOSEO && payload.borde === 0) curiosear(payload.debajo, payload.x, payload.y);
   }
   pulsado = false;
   arrastrando = false;
@@ -655,3 +708,4 @@ iniciarPuente();
 iniciarRitmo();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);
+

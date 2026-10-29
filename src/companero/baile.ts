@@ -1,6 +1,7 @@
 // Pasos de baile con la música. Cada paso dice cómo se mueve el cuerpo y la cara según el
 // pulso de la canción (ritmo.ts). Cada pocos compases cambia a otro paso, elegido según lo
-// intensa que sea esa parte y sin repetir los últimos, y pasa de uno a otro mezclándolos.
+// animada que sea la canción (intensidad de esa parte y tempo: una balada lenta pide mecerse,
+// una rápida, saltitos) y sin repetir los últimos, y pasa de uno a otro mezclándolos.
 import type { OjosBaile } from "./cara";
 
 export interface Movimiento {
@@ -148,12 +149,25 @@ function mezclarMov(a: Movimiento, b: Movimiento, k: number): Movimiento {
   return r;
 }
 
-/** Cómo baila ahora: movimiento del cuerpo y de la cara, y los ojos del paso. */
-export function bailar(ahora: number, pulso: number, energia: number, intensidad: number): { mov: Movimiento; ojos: OjosBaile } {
+/** Lo animada que es la canción (0 a 1): mitad intensidad, mitad tempo (85 a 145 pulsos por minuto). */
+function animacion(intensidad: number, intervalo: number): number {
+  const ppm = 60_000 / intervalo;
+  const tempo = Math.max(0, Math.min(1, (ppm - 85) / 60));
+  return intensidad * 0.5 + tempo * 0.5;
+}
+
+/** Cómo baila ahora: movimiento del cuerpo y de la cara, y los ojos del paso. `intervalo`: ms entre pulsos. */
+export function bailar(
+  ahora: number,
+  pulso: number,
+  energia: number,
+  intensidad: number,
+  intervalo: number,
+): { mov: Movimiento; ojos: OjosBaile } {
   const b = Math.floor(pulso / PULSOS_POR_PASO);
   if (b !== bloque) {
     // Al empezar y luego cada pocos compases
-    const nuevo = elegir(intensidad);
+    const nuevo = elegir(animacion(intensidad, intervalo));
     bloque = b;
     if (nuevo !== actual) {
       anterior = actual;
