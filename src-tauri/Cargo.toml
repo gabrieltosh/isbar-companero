@@ -61,7 +61,11 @@ windows = { version = "0.62", features = [
   # Qué ventana queda debajo del compañero al soltarlo: programa y ventanas ocultas
   "Win32_System_Threading",
   "Win32_Graphics_Dwm",
+  # Evento que pide la escucha de solo la app de música (CreateEventW)
+  "Win32_Security",
 ] }
+# Para escribir el aviso de "escucha preparada" de Windows (macro #[implement]); ya la usa `windows`
+windows-core = "0.62"
 # Tipo IAsyncOperation de WinRT (el crate windows ya no lo reexporta)
 windows-future = "0.3"
 # Tipo IVectorView de WinRT (listas de notificaciones)

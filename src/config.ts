@@ -51,6 +51,8 @@ async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
 
 function pintarValores(): void {
   $(document, "#v-volumen").textContent = `${Math.round(grupos.sonido.volumen * 100)} %`;
+  const opacidad = Math.round(grupos.companero.opacidad * 100);
+  $(document, "#v-opacidad").textContent = opacidad >= 100 ? "Sólido" : `${opacidad} %`;
 }
 
 document.querySelectorAll<HTMLInputElement>("[data-campo]").forEach((input) => {

@@ -5,6 +5,7 @@
 //! Los eventos de WinRT llegan en hilos arbitrarios: solo mandan una señal por un
 //! canal y es el hilo de multimedia el que vuelve a leer todo.
 
+use std::sync::Mutex;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -31,6 +32,20 @@ const DERIVA_MAX_MS: f64 = 2000.0;
 const CARATULA_MAX_BYTES: u64 = 2 * 1024 * 1024;
 /// Diferencia entre la época de Windows (1601) y la de Unix (1970), en unidades de 100 ns.
 const EPOCA_WINDOWS_A_UNIX: i64 = 116_444_736_000_000_000;
+
+/// AppUserModelId de la app de la sesión actual (para escuchar solo esa app en audio.rs).
+static APP_ACTUAL: Mutex<Option<String>> = Mutex::new(None);
+
+/// AppUserModelId de la app que controla la música ahora (p. ej. "Spotify.exe"), si hay.
+pub(crate) fn app_actual() -> Option<String> {
+    APP_ACTUAL.lock().ok().and_then(|a| a.clone())
+}
+
+fn fijar_app_actual(app: Option<String>) {
+    if let Ok(mut actual) = APP_ACTUAL.lock() {
+        *actual = app;
+    }
+}
 
 #[derive(Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -152,6 +167,7 @@ fn bucle(app: &AppHandle) -> WinResult<()> {
             }
         }
 
+        fijar_app_actual(suscripcion.as_ref().and_then(|s| s.sesion.SourceAppUserModelId().ok()).map(|id| id.to_string()));
         let info = match &suscripcion {
             Some(s) => leer(&s.sesion, &mut caratula).ok(),
             None => None,

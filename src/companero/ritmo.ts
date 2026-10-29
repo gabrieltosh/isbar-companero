@@ -1,25 +1,36 @@
-// Ritmo de la música a partir del nivel de sonido (audio.rs). La música actual viene muy
-// comprimida (el nivel casi no baja), así que no se buscan picos absolutos sino subidas
-// bruscas respecto a lo que sonaba justo antes, comparadas con lo normal en esta canción.
-// Con los golpes se estima el tempo y se lleva un pulso continuo: el baile sigue el compás
-// aunque algún golpe no se detecte.
+// Ritmo de la música. Rust escucha lo que suena (audio.rs) y lo analiza (ritmo.rs): manda unas
+// 30 veces por segundo el nivel, las bandas, si hubo golpe, el tempo, el pulso y las partes de
+// la canción. Aquí se lleva el pulso entre mensaje y mensaje (sin saltos), se calculan la
+// energía y la intensidad de esta parte, se sacan las notitas con los golpes y se avisa al
+// baile de las partes nuevas, las pausas y la vuelta de la música.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cambiosMusica, musicaSonando } from "../estado/musica";
 import { crearSenal } from "../estado/senal";
+import { celebrarVuelta, nuevaParte } from "./baile";
 
-/** Un golpe: la subida supera lo normal en tantas desviaciones, y no antes de este tiempo. */
-const DESVIACIONES_GOLPE = 1.3;
-const MINIMO_SUBIDA = 0.012;
-const SEPARACION_MINIMA = 240;
-/** Tempo aceptado (ms entre pulsos): de 67 a 170 pulsos por minuto. */
-const PULSO_MIN = 350;
-const PULSO_MAX = 900;
-/** Sin niveles nuevos en este tiempo, se considera que no hay audio. */
+/** Sin mensajes nuevos en este tiempo, se considera que no hay audio. */
 const SIN_AUDIO_MS = 500;
+/** El baile va este tiempo por delante de lo analizado (mensaje y dibujo tardan un poco). */
+const ADELANTO_MS = 25;
 /** Notitas a la vez, como mucho, y lo que tarda cada una en subir y desvanecerse. */
 const MAX_NOTAS = 4;
 export const VIDA_NOTA = 1600;
+
+/** Lo que manda Rust (ritmo.rs). */
+interface EstadoAudio {
+  nivel: number;
+  graves: number;
+  medios: number;
+  agudos: number;
+  golpe: boolean;
+  intervalo: number;
+  pulso: number;
+  confianza: number;
+  pausa: boolean;
+  /** Momento de la canción, si lo hubo desde el mensaje anterior */
+  seccion: "cambio" | "pausa" | "vuelta" | null;
+}
 
 export interface Nota {
   nace: number;
@@ -38,6 +49,12 @@ export const ritmo = {
   lado: 1,
   /** Milisegundos entre pulsos (tempo estimado) */
   intervalo: 500,
+  /** Qué claro está el ritmo (0 a 1) */
+  confianza: 0,
+  /** La canción está en una pausa (sin graves): espera quieto */
+  pausa: false,
+  /** Energía de graves, medios y agudos (0 a 1) */
+  bandas: [0, 0, 0] as [number, number, number],
   notas: [] as Nota[],
 };
 
@@ -45,38 +62,39 @@ export const ritmo = {
 export const golpe = crearSenal();
 
 let ultimoNivel = 0;
-let ultimoGolpe = 0;
 let rapida = 0;
 let lenta = 0;
 let larga = 0;
 let maximo = 0.1;
 let minimo = 0;
-let subidaMedia = 0;
-let subidaVar = 0.0004;
-let subidaAnterior = 0;
 let golpes = 0;
-/** Pulsos contados (con decimales) hasta el último nivel recibido. */
+let partes = 0;
+/** Pulso en el último mensaje (llevado sin saltos) y cuándo llegó. */
 let pulso = 0;
+let pulsoEn = 0;
 
 /** Hay audio sonando (llegan niveles y no es silencio). */
 export function hayAudio(): boolean {
   return performance.now() - ultimoNivel < SIN_AUDIO_MS && lenta > 0.02;
 }
 
-/** Pulso de la canción ahora mismo: la parte entera cuenta pulsos, la decimal va de un pulso al siguiente. */
+/** Pulso al ritmo de la canción: la parte entera cuenta pulsos (múltiplos de 4 = primer
+ * tiempo del compás), la decimal va de un pulso al siguiente. */
 export function pulsoAhora(): number {
-  const pasado = Math.min(SIN_AUDIO_MS, performance.now() - ultimoNivel);
-  return pulso + pasado / ritmo.intervalo;
+  const pasado = Math.min(SIN_AUDIO_MS, performance.now() - pulsoEn);
+  return pulso + (pasado + ADELANTO_MS) / ritmo.intervalo;
 }
 
-/** Ajusta el tempo con el tiempo entre dos golpes (llevándolo al rango aceptado). */
-function ajustarTempo(d: number): void {
-  while (d > PULSO_MAX) d /= 2;
-  while (d < PULSO_MIN) d *= 2;
-  if (d > PULSO_MAX) return;
-  // Si se parece al tempo actual, se afina; si no, se acerca despacio (puede haber cambiado)
-  const parecido = Math.abs(d - ritmo.intervalo) / ritmo.intervalo < 0.2;
-  ritmo.intervalo += (d - ritmo.intervalo) * (parecido ? 0.25 : 0.06);
+/** Pulsos por minuto y aciertos, para ver en el panel cómo va el reconocimiento. */
+export function resumenRitmo(): { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null {
+  if (!hayAudio()) return null;
+  return { ppm: Math.round(60_000 / ritmo.intervalo), confianza: ritmo.confianza, golpes, partes, pausa: ritmo.pausa };
+}
+
+/** Saca una notita por un lado (como mucho MAX_NOTAS a la vez). */
+function sacarNota(ahora: number, lado: number): void {
+  ritmo.notas = ritmo.notas.filter((n) => ahora - n.nace < VIDA_NOTA).slice(-(MAX_NOTAS - 1));
+  ritmo.notas.push({ nace: ahora, lado });
 }
 
 /** El sonido más fuerte de hace poco: con él se ajusta la escala (ganancia automática). */
@@ -84,15 +102,13 @@ let pico = 0;
 /** Por debajo de esto (sin ajustar) se considera silencio. */
 const SILENCIO = 0.004;
 
-function procesar(bruto: number): void {
+function procesar(e: EstadoAudio): void {
   const ahora = performance.now();
   // Ganancia automática: el nivel se mide respecto a lo más fuerte que ha sonado hace poco
   // (baja despacio, unos segundos). Así da igual el dispositivo o el volumen
-  pico = Math.max(bruto, pico * 0.997);
-  const nivel = bruto < SILENCIO ? 0 : Math.min(1, bruto / Math.max(pico, 0.02));
-  const paso = ultimoNivel ? Math.min(SIN_AUDIO_MS, ahora - ultimoNivel) : 33;
+  pico = Math.max(e.nivel, pico * 0.997);
+  const nivel = e.nivel < SILENCIO ? 0 : Math.min(1, e.nivel / Math.max(pico, 0.02));
   ultimoNivel = ahora;
-  pulso += paso / ritmo.intervalo;
 
   rapida += (nivel - rapida) * 0.55;
   lenta += (nivel - lenta) * 0.12;
@@ -106,30 +122,34 @@ function procesar(bruto: number): void {
   ritmo.energia += (energia - ritmo.energia) * (energia > ritmo.energia ? 0.6 : 0.2);
   const intensidad = Math.max(0, Math.min(1, (larga - minimo) / rango));
   ritmo.intensidad += (intensidad - ritmo.intensidad) * 0.03;
+  ritmo.bandas = [e.graves, e.medios, e.agudos];
+  ritmo.confianza = e.confianza;
+  ritmo.pausa = e.pausa;
+  if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
+  if (e.seccion === "cambio") nuevaParte();
+  if (e.seccion === "vuelta") {
+    // Vuelve la música: celebra con un latido fuerte y notitas por los dos lados
+    celebrarVuelta();
+    ritmo.latido = 1;
+    sacarNota(ahora, -1);
+    sacarNota(ahora, 1);
+  }
 
-  // Subida respecto a lo que sonaba antes, comparada con lo normal en esta canción
-  const subida = Math.max(0, rapida - lenta);
-  const desviacion = Math.sqrt(subidaVar);
-  const umbral = subidaMedia + desviacion * DESVIACIONES_GOLPE;
-  const cresta = subida < subidaAnterior && subidaAnterior > umbral && subidaAnterior > MINIMO_SUBIDA;
-  subidaAnterior = subida;
-  subidaMedia += (subida - subidaMedia) * 0.03;
-  subidaVar += ((subida - subidaMedia) ** 2 - subidaVar) * 0.03;
+  // Pulso: entre mensajes avanza solo; con cada uno se acerca a lo que dice Rust. Si la
+  // diferencia es grande (cambio de tempo o de compás), salta directamente
+  const previsto = pulsoAhora() - ADELANTO_MS / ritmo.intervalo;
+  const error = e.pulso - previsto;
+  pulso = Math.abs(error) > 0.5 ? e.pulso : previsto + error * 0.35;
+  pulsoEn = ahora;
+  ritmo.intervalo = e.intervalo;
 
-  const separacion = Math.max(SEPARACION_MINIMA, ritmo.intervalo * 0.55);
-  if (!cresta || ahora - ultimoGolpe < separacion) return;
-  if (ultimoGolpe) ajustarTempo(ahora - ultimoGolpe);
-  ultimoGolpe = ahora;
-  // El pulso se acerca al golpe (sin saltar de golpe)
-  const desfase = pulso - Math.round(pulso);
-  pulso -= desfase * 0.5;
+  if (!e.golpe) return;
   ritmo.latido = 1;
   golpes += 1;
   // Una notita cada dos golpes, alternando el lado
   if (golpes % 2 === 0) {
     ritmo.lado = -ritmo.lado;
-    ritmo.notas = ritmo.notas.filter((n) => ahora - n.nace < VIDA_NOTA).slice(-(MAX_NOTAS - 1));
-    ritmo.notas.push({ nace: ahora, lado: ritmo.lado });
+    sacarNota(ahora, ritmo.lado);
   }
   golpe.emitir();
 }
@@ -140,7 +160,7 @@ export function apagarLatido(dt: number): void {
 }
 
 export function iniciarRitmo(): void {
-  // Solo se escucha el nivel mientras suena música
+  // Solo se escucha mientras suena música
   let escuchando = false;
   const actualizar = () => {
     const sonando = musicaSonando();
@@ -150,5 +170,5 @@ export function iniciarRitmo(): void {
   };
   cambiosMusica.escuchar(actualizar);
   actualizar();
-  listen<number>("audio-nivel", ({ payload }) => procesar(payload)).catch(console.error);
+  listen<EstadoAudio>("audio-ritmo", ({ payload }) => procesar(payload)).catch(console.error);
 }

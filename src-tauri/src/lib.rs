@@ -16,6 +16,8 @@ mod fullscreen;
 mod media;
 #[cfg(target_os = "windows")]
 mod notifications;
+#[cfg(any(target_os = "windows", test))]
+mod ritmo;
 
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;

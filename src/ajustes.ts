@@ -42,9 +42,11 @@ export interface ConfigCompanero {
   tamano: number;
   /** Sin rutinas llamativas (silbar, estirarse) y con menos movimiento */
   tranquilo: boolean;
+  /** Opacidad del cuerpo: 1 sólido; menos, cristal que deja ver lo de detrás (hasta 0.5) */
+  opacidad: number;
 }
 
-export const COMPANERO_POR_DEFECTO: ConfigCompanero = { color: "#f5f7ff", tamano: 1, tranquilo: false };
+export const COMPANERO_POR_DEFECTO: ConfigCompanero = { color: "#f5f7ff", tamano: 1, tranquilo: false, opacidad: 1 };
 
 /** Colores de cara que se pueden elegir: [valor, nombre], en este orden. */
 export const COLORES_COMPANERO: [string, string][] = [

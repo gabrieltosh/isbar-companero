@@ -22,6 +22,8 @@ export interface EstadoPanel {
     proxima: { tipo: TipoPausa; nombre: string; cuando: string } | null;
   };
   musica: (InfoMedia & { posicion: number }) | null;
+  /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
+  ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null;
 }
 
 export type OrdenPanel =

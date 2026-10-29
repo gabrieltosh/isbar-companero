@@ -29,6 +29,7 @@ import {
 } from "../estado/pomodoro";
 import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoPanel, type OrdenPanel } from "../panel/tipos";
 import { pausarGlobos } from "./globos";
+import { resumenRitmo } from "./ritmo";
 import { responder, responderMusica } from "./respuestas";
 import { gesto } from "./vida";
 
@@ -51,6 +52,7 @@ function foto(): EstadoPanel {
         : null,
     },
     musica: info ? { ...info, posicion: posicionMusica() } : null,
+    ritmo: resumenRitmo(),
   };
 }
 

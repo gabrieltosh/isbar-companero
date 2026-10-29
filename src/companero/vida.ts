@@ -83,7 +83,9 @@ export function esDeNoche(fecha = new Date()): boolean {
 }
 
 const azar = <T>(opciones: T[]): T => opciones[Math.floor(Math.random() * opciones.length)];
-const progresoDe = (m: Momento, ahora: number) => Math.min(1, (ahora - m.desde) / (m.hasta - m.desde));
+// De 0 a 1. El tiempo del fotograma puede ser un poco anterior a `desde` (si el momento empezó
+// en ese mismo fotograma): sin el mínimo saldría negativo
+const progresoDe = (m: Momento, ahora: number) => Math.max(0, Math.min(1, (ahora - m.desde) / (m.hasta - m.desde)));
 
 /** La cara que acompaña a cada rutina. */
 function expresionDeRutina(r: Rutina): Expresion {

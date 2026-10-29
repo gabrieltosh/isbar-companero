@@ -113,6 +113,8 @@ const pose: Pose = { miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0 };
 const baile: Movimiento = { ...SIN_BAILE };
 /** Ojos del baile, mezclados para pasar de un paso a otro sin saltos */
 const ojosBaile: Record<OjosBaile, number> = { felices: 1, cerrados: 0, abiertos: 0, apretados: 0 };
+/** Cuánto canta (0: sonríe con la boca cerrada; 1: canta), para pasar de uno a otro sin saltos */
+let canto = 0;
 let expresionActual: Expresion = "normal";
 let progresoActual = 0;
 // Morph: al cambiar de cara, los rasgos van de los que se veían a los de la cara nueva.
@@ -166,10 +168,12 @@ function fotograma(ahora: number): void {
   const conRitmo = expresion === "musica" && hayAudio();
   let objetivoBaile = SIN_BAILE;
   let ojosObjetivo: OjosBaile = "felices";
+  let cantaObjetivo = 0;
   if (conRitmo) {
-    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo);
+    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
+    cantaObjetivo = paso.canta ? 1 : 0;
   } else if (expresion === "asiente") {
     // El cuerpo acompaña el sí
     objetivoBaile = { ...SIN_BAILE, y: Math.max(0, Math.sin(progreso * Math.PI * 6)) * 1.5 * (1 - progreso) };
@@ -193,10 +197,12 @@ function fotograma(ahora: number): void {
   for (const tipo of Object.keys(ojosBaile) as OjosBaile[]) {
     ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === ojosObjetivo ? 1 : 0, 0.08);
   }
+  canto = acercar(canto, cantaObjetivo, 0.06);
   pose.musica =
     expresion === "musica"
       ? {
           ojos: ojosBaile,
+          canta: canto,
           energia: conRitmo ? ritmo.energia : 0,
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
@@ -337,7 +343,10 @@ function fotograma(ahora: number): void {
       giro += Math.sin(ahora / 30) * 1.5;
       break;
   }
-  pose.giro = acercar(pose.giro, giro, expresion === "musica" ? 0.45 : 0.2);
+  // El giro va por el camino corto: tras una vuelta entera (360°) no se deshace hacia atrás
+  const giroCercano = giro + Math.round((pose.giro - giro) / 360) * 360;
+  pose.giro = acercar(pose.giro, giroCercano, expresion === "musica" ? 0.45 : 0.2);
+  pose.giro -= Math.round(pose.giro / 360) * 360;
   pose.salto = salto;
 
   // Cuerpo: se estira, bosteza o saluda; vuelve solo a su forma tras el rebote
@@ -691,12 +700,13 @@ listen<number>("companero-inactivo", ({ payload }) => {
 
 // ---------- Ajustes ----------
 
-/** Color, tamaño y modo tranquilo elegidos en la configuración. */
+/** Color, tamaño, modo tranquilo y opacidad elegidos en la configuración. */
 async function aplicarAjustes(): Promise<void> {
   const nuevo = { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) };
   const cambiaTamano = nuevo.tamano !== config.tamano;
   config = nuevo;
   document.documentElement.style.setProperty("--e", String(config.tamano));
+  document.documentElement.style.setProperty("--opacidad", String(Math.max(0.5, Math.min(1, config.opacidad))));
   // Solo el compañero recibe el ratón; el resto de la ventana deja pasar los clics
   const m = MARGEN * config.tamano;
   const l = LADO * config.tamano;

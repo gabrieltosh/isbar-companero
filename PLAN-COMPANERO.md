@@ -10,8 +10,8 @@ sonidos.
 ## Estado actual
 
 **Hechas: fases 0 a 4**, más muchas mejoras pedidas por el camino (ver «Añadido fuera del plan»).
-**Siguiente: fase 5 (asistente).** Pendiente aparte: mejorar el reconocimiento de la música
-(sección propia más abajo).
+**Siguiente: fase 5 (asistente).** Reconocimiento de la música: mejoras 1 a 9 hechas; falta
+afinarlas con canciones reales.
 
 | Fase | Estado |
 |---|---|
@@ -56,9 +56,14 @@ sonidos.
   lado con espacio, con nubecitas hacia el compañero.
 - **Panel** (clic): Inicio, Avisos, Música (con barra de tiempo arrastrable); Recordatorios y Chat
   en la fase 5.
-- **Música**: baila al pulso de la canción con siete pasos (balanceo, cabeceo, saltitos, paso
-  lateral, vuelta, sacudida, mecerse) elegidos según intensidad y tempo; canta con el volumen;
-  notas al ritmo; globo con la canción al cambiar de pista. Sin volumen, no baila.
+- **Música**: baila al pulso de la canción con catorce pasos. Tranquilos: mecerse, flotar (solo
+  hasta 105 ppm), asentir lento, balanceo, vuelta. Medios: cabeceo, metrónomo, rebote, paso
+  lateral. Intensos: saltitos, sacudida, pogo (desde 110 ppm), contratiempo (hasta 125 ppm),
+  remolino. Cada dos compases (o al empezar una parte nueva) sortea entre los que encajan con lo
+  animada que está la música (intensidad y tempo), con más probabilidad para los que mejor
+  encajan y sin repetir los tres últimos. En una pausa espera; al volver la música, celebra.
+  Canta con el volumen; notas al ritmo; globo con la canción al cambiar de pista. Sin volumen,
+  no baila.
 - **Iconos de estado** sobre la cabeza: progreso del Pomodoro en el borde (hecho); sin internet y
   batería baja (fase 6).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
@@ -82,7 +87,7 @@ sonidos.
 | `src/companero/avisos.ts` | Notificaciones, música, Pomodoro, agua y pausas como globos |
 | `src/companero/globos.ts` | Cola de globos |
 | `src/companero/puente.ts` | Estado para el panel y órdenes del panel |
-| `src/companero/ritmo.ts` | Golpes, tempo y pulso de la música a partir del nivel de sonido |
+| `src/companero/ritmo.ts` | Pulso sin saltos entre mensajes, energía, intensidad y notitas |
 | `src/companero/baile.ts` | Pasos de baile, elección por intensidad y tempo, mezcla entre pasos |
 | `src/companero/entorno.ts` | Clasifica la ventana de debajo y recuerda sitios visitados |
 | `src/companero/respuestas.ts` | Gestos de sí, no y no sé al interactuar |
@@ -96,7 +101,8 @@ sonidos.
 | `window.rs` | Visibilidad, click-through, cursor cerca |
 | `globo.rs`, `panel.rs`, `tray.rs` | Globo, panel y menú de la bandeja |
 | `media.rs` | Música del sistema (SMTC), controles y saltar a una posición |
-| `audio.rs` | Medidor de pico del dispositivo de salida (solo mientras suena música) |
+| `audio.rs` | Escucha la app de música (o toda la salida) con WASAPI loopback, solo mientras suena |
+| `ritmo.rs` | Bandas, golpes, tempo, pulso, compás y partes de la canción (sin código de Windows; con pruebas) |
 | `debajo.rs` | Programa y título de la ventana que queda debajo al soltarlo |
 | `notifications.rs` | Notificaciones del sistema (UserNotificationListener) |
 | `fullscreen.rs` | Ocultarse con una app a pantalla completa |
@@ -156,8 +162,8 @@ Cada fase termina con algo que funciona y se puede probar.
 
 ## Mejorar el reconocimiento de la música
 
-### Cómo funciona hoy
-- `audio.rs` lee **solo el medidor de pico** del dispositivo de salida (~30 veces por segundo). Es
+### Cómo funcionaba antes (medidor de pico)
+- `audio.rs` leía **solo el medidor de pico** del dispositivo de salida (~30 veces por segundo). Es
   un único número de 0 a 1: no distingue graves de agudos ni qué app suena.
 - `ritmo.ts` aplica una **ganancia automática** (respecto a lo más fuerte de hace unos segundos),
   busca **subidas bruscas** del nivel frente a lo que sonaba justo antes con un umbral que se
@@ -170,7 +176,45 @@ Cada fase termina con algo que funciona y se puede probar.
   - No sabe dónde empieza el compás ni cuándo llega el estribillo o una pausa.
   - Cualquier sonido del PC (una videollamada, un juego, un aviso) se mezcla con la música.
 
+### Cómo funciona ahora
+- `audio.rs` escucha **solo la app de música** con el loopback por proceso: toma la app de SMTC
+  (`media::app_actual`), busca su proceso entre las sesiones de audio del dispositivo (por paquete,
+  nombre del ejecutable o identificador de sesión; prefiere la que está sonando) y la escucha con
+  sus procesos hijos. Si no la encuentra o Windows no lo admite, escucha toda la salida con
+  **WASAPI loopback**. Todo en memoria, sin guardar nada. Cada 3 s mira si ha cambiado el
+  dispositivo o la app; al reabrir conserva el tempo y el pulso.
+- `ritmo.rs` mide cada 10 ms tres bandas con filtros sencillos (sin FFT ni dependencias nuevas):
+  graves < 150 Hz, medios 300–2500 Hz y agudos > 5 kHz. El **flujo** (cuánto crece cada banda,
+  en logaritmo) marca los golpes; los graves pesan más.
+- **Tempo** por autocorrelación del flujo de los últimos 8 s, prefiriendo 90–140 ppm y
+  descartando un tempo si su mitad también encaja. Un tempo nuevo se acepta si se repite ~1 s.
+- **Pulso** que avanza solo y cada 250 ms se acerca a la fase que mejor encaja con los golpes
+  (más deprisa cuanto más claro es el ritmo), adelantado 34 ms por el retraso de la medida.
+- **Compás**: el pulso de cada cuatro con más graves es el primero; el baile cambia de paso al
+  empezar un compás y marca más el primer tiempo.
+- **Partes de la canción**: si el reparto de graves, medios y agudos de los últimos 2 s cambia
+  claramente respecto a los 2 s anteriores, es una parte nueva (como mucho una cada 8 s) y el baile
+  cambia de paso al empezar el compás siguiente. Si se van los graves más de 1 s con música
+  sonando, es una **pausa**: se queda esperando, casi quieto y mirando a los lados. Cuando vuelven
+  los graves (tras al menos 2 s de pausa), **celebra** un compás con saltos grandes y notitas.
+- El panel (pestaña Música) muestra pulsos por minuto, lo claro que está el ritmo, los golpes y
+  las partes (o «en pausa»).
+- Pruebas (`cargo test --lib ritmo`) con pistas sintéticas de 80 a 170 ppm: tempo con menos de
+  un 2 % de error, pulso con menos de 0,04 pulsos de desfase, compás correcto, cambio de tempo,
+  estribillo como parte nueva, pausa y vuelta a su hora, sin avisos en una pista uniforme y
+  silencio sin golpes.
+
+### Qué falta afinar con música real
+- `ADELANTO_MS` (`ritmo.ts`) si el salto no cae justo en el golpe (con Bluetooth irá adelantado).
+- Umbrales de partes (`UMBRAL_CAMBIO`) y pausas (`CAIDA_PAUSA`) en `ritmo.rs`.
+- Apps cuyo proceso no se reconoce (se nota porque baila también con otros sonidos). Para ver
+  qué sesiones de audio hay y comparar lo que suena en total con lo de una app:
+  `APP_PRUEBA=Spotify.exe cargo test --lib audio -- --ignored --nocapture` (en `src-tauri/`).
+
 ### Mejoras propuestas (en orden recomendado)
+Todas hechas (la FFT del punto 2 se cambió por filtros, sin dependencia nueva; el punto 8
+funciona desde Windows 10 2004).
+
 
 1. **Capturar el audio de salida con WASAPI en modo loopback** (en vez del medidor de pico).
    Se recibe la onda que suena (sin grabarla ni guardarla: se analiza en memoria y se descarta),

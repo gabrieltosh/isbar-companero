@@ -142,6 +142,14 @@ function pintarMusica(e: EstadoPanel): void {
   // Mientras se arrastra, la barra la mueve el ratón
   if (!buscando) pintarPosicion(m.duracionMs > 0 ? m.posicion / m.duracionMs : 0, m.posicion);
   fijarHtml($(document, ".mg-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
+  const r = e.ritmo;
+  const ritmo = $(document, ".mg-ritmo");
+  ritmo.hidden = !r;
+  if (r) {
+    const claro = r.confianza >= 0.6 ? "claro" : r.confianza >= 0.3 ? "regular" : "dudoso";
+    const parte = r.pausa ? "en pausa" : `${r.partes} ${r.partes === 1 ? "parte" : "partes"}`;
+    ritmo.textContent = `${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · ${r.golpes} golpes · ${parte}`;
+  }
 }
 
 /** Barra de la canción (fracción de 0 a 1) y el tiempo de la izquierda. */

@@ -407,6 +407,12 @@ svg {
 .progreso .barra i {
   background: var(--texto);
 }
+/* Lo que reconoce el compañero de la canción (pulsos por minuto y lo claro que está) */
+.mg-ritmo {
+  color: var(--suave);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
 .controles {
   display: flex;
   gap: 14px;

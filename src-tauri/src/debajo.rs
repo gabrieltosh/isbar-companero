@@ -70,7 +70,8 @@ unsafe extern "system" fn revisar(hwnd: HWND, datos: LPARAM) -> BOOL {
     true.into()
 }
 
-fn programa(pid: u32) -> Option<String> {
+/// Nombre del ejecutable de un proceso, en minúsculas (p. ej. "spotify.exe").
+pub(crate) fn programa(pid: u32) -> Option<String> {
     // SAFETY: se abre el proceso solo para leer su ruta y se cierra al terminar.
     unsafe {
         let proceso = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;

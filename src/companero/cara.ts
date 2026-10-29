@@ -70,6 +70,8 @@ export type OjosBaile = "felices" | "cerrados" | "abiertos" | "apretados";
 export interface MusicaPose {
   /** Cuánto de cada tipo de ojos (suman 1; así se pasa de unos a otros sin saltos) */
   ojos: Record<OjosBaile, number>;
+  /** Cuánto canta: 0 sonríe con la boca cerrada, 1 canta con el volumen */
+  canta: number;
   /** Nivel de ahora (0 a 1) */
   energia: number;
   /** Nivel medio de esta parte de la canción (0 a 1): tranquila o intensa */
@@ -228,7 +230,7 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
         const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
         return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
       }
-      // Los ojos, según el paso de baile; la boca canta con el volumen
+      // Los ojos, según el paso de baile; la boca sonríe o canta con el volumen (a ratos)
       const formas: Record<OjosBaile, Ojo> = {
         felices: OJO_FELIZ,
         cerrados: ojo(10.5, 1.2, -1.4, 0, 0, 1),
@@ -241,8 +243,10 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
         const f = formas[tipo];
         o = ojo(o.w + f.w * peso, o.t + f.t * peso, o.b + f.b * peso, o.giro + f.giro * peso, o.dx + f.dx * peso, o.dy + f.dy * peso);
       }
-      const a = 1 + limitar(musica.energia, 0, 1) * 6;
-      return iguales(o, boca(9 + a * 0.4, -a, a, 0, 0, 3));
+      const a = 1 + limitar(musica.energia, 0, 1) * 4.5;
+      const cantando = boca(9 + a * 0.4, -a, a, 0, 0, 3);
+      const sonriendo = boca(13, 4, 4.5, 0, 0, 2);
+      return iguales(o, mezclarObj(sonriendo, cantando, limitar(musica.canta, 0, 1)));
     }
     case "silba":
       return iguales(ojo(8.4, 4.2, 4.2, 0, 0, -1), boca(5.2, -2.6, 2.6, 0, 2, 3));
@@ -301,7 +305,7 @@ export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
     bo.giro,
     c,
   );
-  return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">${pintarOjo(r.izq, OJO_IZQ)}${pintarOjo(r.der, OJO_DER)}${boca}</g>`;
+  return `<g transform="rotate(${n(p.giro)} 32 32)">${pintarOjo(r.izq, OJO_IZQ)}${pintarOjo(r.der, OJO_DER)}${boca}</g>`;
 }
 
 // ---------- Extras (no se transforman: aparecen y desaparecen con un fundido) ----------

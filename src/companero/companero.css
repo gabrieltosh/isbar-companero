@@ -1,9 +1,10 @@
 /* Compañero: una pantallita de cristal oscuro con cara LED. */
 
 :root {
-  /* Tamaño elegido en la configuración (lo fija main.ts) */
+  /* Tamaño y opacidad del cuerpo elegidos en la configuración (los fija main.ts) */
   --e: 1;
-  --cristal: rgba(8, 8, 12, 0.88);
+  --opacidad: 1;
+  --cristal: rgba(8, 8, 12, var(--opacidad));
   --borde-cristal: rgba(255, 255, 255, 0.1);
 }
 
