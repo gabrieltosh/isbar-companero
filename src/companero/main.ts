@@ -144,25 +144,25 @@ function fotograma(ahora: number): void {
   }
   expresionActual = expresion;
   progresoActual = progreso;
-  // Con música, baila: con audio, al pulso de la canción; sin él, a un pulso fijo
+  // Con música que se oye, baila al pulso de la canción; sin volumen (o en silencio), no
   const conRitmo = expresion === "musica" && hayAudio();
   let objetivoBaile = SIN_BAILE;
-  if (expresion === "musica") {
-    const paso = conRitmo
-      ? bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad)
-      : bailar(ahora, ahora / 500, 0.5 + Math.sin(ahora / 900) * 0.3, 0.5);
+  let ojosObjetivo: OjosBaile = "felices";
+  if (conRitmo) {
+    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad);
     objetivoBaile = paso.mov;
-    for (const tipo of Object.keys(ojosBaile) as OjosBaile[]) {
-      ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === paso.ojos ? 1 : 0, 0.08);
-    }
+    ojosObjetivo = paso.ojos;
   } else {
     pararBaile();
+  }
+  for (const tipo of Object.keys(ojosBaile) as OjosBaile[]) {
+    ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === ojosObjetivo ? 1 : 0, 0.08);
   }
   pose.musica =
     expresion === "musica"
       ? {
           ojos: ojosBaile,
-          energia: conRitmo ? ritmo.energia : 0.4 + Math.abs(Math.sin(ahora / 180)) * 0.5,
+          energia: conRitmo ? ritmo.energia : 0,
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
           vidaNota: VIDA_NOTA,
