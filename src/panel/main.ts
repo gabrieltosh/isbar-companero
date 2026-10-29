@@ -39,8 +39,12 @@ const ordenar = (o: OrdenPanel) => void emit(EVENTO_ORDEN, o);
  * Cambia el contenido de un elemento solo si es distinto. El panel se repinta cada medio
  * segundo: si se reescribiera un botón mientras se pulsa, el clic se perdería.
  */
+const htmlPuesto = new WeakMap<HTMLElement, string>();
 function fijarHtml(el: HTMLElement, html: string): void {
-  if (el.innerHTML !== html) el.innerHTML = html;
+  // Se compara con lo último que se puso (el navegador reescribe el SVG al guardarlo)
+  if (htmlPuesto.get(el) === html) return;
+  htmlPuesto.set(el, html);
+  el.innerHTML = html;
 }
 
 const litros = (ml: number) => (ml / 1000).toFixed(1).replace(".", ",");
