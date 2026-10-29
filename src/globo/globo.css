@@ -118,7 +118,12 @@ body {
   transform: scale(0.9);
 }
 
-/* Menú (clic derecho): sin caja; cada opción es un pensamiento suelto que aparece uno tras otro */
+/* Menú (clic derecho): sin caja; cada opción es un pensamiento suelto que aparece uno tras otro.
+   Mide lo que ocupa de verdad (no el ancho de la ventana del globo anterior), para que la
+   ventana se ajuste a él y no recorte ni parta el texto */
+.globo.menu {
+  width: max-content;
+}
 .menu .caja {
   width: auto;
   padding: 0;
@@ -146,6 +151,7 @@ body {
     0 2px 10px rgba(0, 0, 0, 0.18);
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   opacity: 0;
   transform: scale(0.6);
   transform-origin: 0% 100%;
