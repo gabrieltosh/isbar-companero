@@ -4,7 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { EVENTO_AJUSTES, GLOBOS_POR_DEFECTO, JEV_POR_DEFECTO, type ConfigGlobos, type ConfigJev } from "../ajustes";
-import { jevDisponible, preguntarJev } from "../estado/jev";
+import { importanciaNotificacion, jevDisponible, type Importancia } from "../estado/jev";
 import { responder, responderMusica } from "./respuestas";
 import { beber, configAgua, iniciarAgua, mlHoy, recordatorioAgua } from "../estado/agua";
 import {
@@ -39,7 +39,7 @@ import { alternarPomodoro, duracion, estadoPomodoro, iniciarPomodoro, pomodoroTe
 import { iniciarSonido } from "../sonido";
 import { guardar, leer } from "../store";
 import type { Expresion } from "./cara";
-import { actualizar, avisar, cerrar, globoActual, iniciarGlobos } from "./globos";
+import { actualizar, avisar, cerrar, globoActual, iniciarGlobos, pideAtencion } from "./globos";
 import { gesto } from "./vida";
 
 /** Lo que tarda en irse cada tipo de globo (ms). */
@@ -91,8 +91,6 @@ async function cargarConfigJev(): Promise<void> {
   configJev = { ...JEV_POR_DEFECTO, ...(await leer<Partial<ConfigJev>>("jevConfig", {})) };
 }
 
-type Importancia = "urgente" | "normal" | "ruido";
-
 /**
  * Con Jev activado, decide si la notificación es urgente, normal o ruido. Si está apagado, falla,
  * tarda o duda, es «normal» (lo de siempre). Cada decisión queda en la consola para comparar.
@@ -100,26 +98,9 @@ type Importancia = "urgente" | "normal" | "ruido";
 async function clasificarNotificacion(n: Notificacion): Promise<Importancia> {
   if (!jevDisponible(configJev) || !configJev.notificaciones) return "normal";
   try {
-    const { respuestas } = await preguntarJev(
-      configJev.clave,
-      { app: n.app, titulo: n.titulo, texto: n.texto, hora: new Date().toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }) },
-      {
-        importancia: {
-          type: "choice",
-          instructions: "Qué importancia tiene esta notificación del ordenador para la persona que lo está usando",
-          criteria: {
-            urgente:
-              "Hay que verla ya: alguien espera una respuesta inmediata, una reunión o llamada empieza ahora, un error grave, un aviso de seguridad o un pago",
-            normal: "Un mensaje o aviso que conviene leer, pero puede esperar unos minutos",
-            ruido: "Publicidad, promociones, novedades o consejos de una app, avisos automáticos sin importancia",
-          },
-        },
-      },
-    );
-    const r = respuestas.importancia;
-    console.info(`jev: «${n.app} · ${n.titulo}» → ${r.choice} (${Math.round(r.confidence * 100)} %)`);
-    if (r.confidence < CONFIANZA_JEV) return "normal";
-    return r.choice === "urgente" || r.choice === "ruido" ? r.choice : "normal";
+    const { importancia, confianza } = await importanciaNotificacion(configJev.clave, n);
+    console.info(`jev: «${n.app} · ${n.titulo}» → ${importancia} (${Math.round(confianza * 100)} %)`);
+    return confianza < CONFIANZA_JEV ? "normal" : importancia;
   } catch (e) {
     console.warn("jev: sin decisión, notificación normal:", e);
     return "normal";
@@ -137,6 +118,8 @@ function avisarNotificacion(n: Notificacion, urgente = false): void {
     duracion: urgente ? 0 : DURACION_NOTIFICACION,
     gesto: urgente ? "sorpresa" : "notificacion",
     urgente,
+    // Mientras se ve, deja lo que estaba haciendo (bailar incluido) y lo atiende
+    atencion: urgente,
     // Varias seguidas de la misma app: solo la última (todas siguen en la pestaña Avisos)
     grupo: urgente ? undefined : `notificacion:${n.app}`,
     acciones: [
@@ -394,6 +377,8 @@ function iniciarAvisosPausas(): void {
 
 /** Lo que la app pide al compañero ahora mismo (sin contar los globos), o null. */
 export function peticionApp(): Expresion | null {
+  // Una urgente a la vista pasa por delante de la música: deja de bailar y la atiende
+  if (pideAtencion()) return "notificacion";
   if (musicaSonando()) return "musica";
   return null;
 }

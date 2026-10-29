@@ -382,6 +382,15 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     }
     case "pensativo":
       return `<circle cx="62" cy="10" r="2.2" ${conBorde(c)}/><circle cx="69" cy="3" r="3.2" ${conBorde(c)}/>`;
+    case "notificacion": {
+      // Un «!» que da saltitos junto a la cabeza: hay algo que mirar
+      const y = 8 - Math.abs(Math.sin(t / 220)) * 3;
+      return (
+        `<path d="M62 ${n(y - 9)}v6.5" stroke="${BORDE}" stroke-width="${n(3 + GROSOR_BORDE * 2)}" stroke-linecap="round"/>` +
+        `<path d="M62 ${n(y - 9)}v6.5" stroke="${c}" stroke-width="3" stroke-linecap="round"/>` +
+        `<circle cx="62" cy="${n(y + 2)}" r="${n(1.6 + GROSOR_BORDE)}" fill="${BORDE}"/><circle cx="62" cy="${n(y + 2)}" r="1.6" fill="${c}"/>`
+      );
+    }
     case "curioso": {
       // Un interrogante que aparece con un saltito y se balancea
       const s = Math.min(1, progreso / 0.12);

@@ -98,6 +98,61 @@ select:focus {
   outline: 1px solid var(--azul);
 }
 
+/* Resultado de probar el filtro de Jev: una fila por notificación de ejemplo */
+.jev-ejemplos {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.jev-ejemplos[hidden] {
+  display: none;
+}
+.jev-ejemplos li {
+  display: grid;
+  /* minmax(0, …): el texto se recorta con «…» en vez de empujar la decisión fuera */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--control);
+  font-size: 12px;
+}
+.jev-ejemplos li > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jev-ejemplos small {
+  display: block;
+  color: var(--gris);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jev-ejemplos b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.jev-ejemplos .bien {
+  color: var(--verde);
+}
+.jev-ejemplos .mal {
+  color: #ff9f0a;
+}
+.jev-ejemplos .resumen {
+  display: block;
+  white-space: normal;
+  background: none;
+  padding: 2px 0 0;
+  color: var(--gris);
+}
+
 input[type="range"] {
   width: 140px;
   accent-color: var(--azul);

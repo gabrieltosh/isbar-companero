@@ -27,6 +27,8 @@ export interface Aviso extends Omit<ContenidoGlobo, "id"> {
   urgente?: boolean;
   /** Uno nuevo del mismo grupo sustituye al que esperaba (y al que se ve, si es pasajero) */
   grupo?: string;
+  /** Mientras se ve, el compañero lo atiende (deja de bailar y pone cara de alerta) */
+  atencion?: boolean;
 }
 
 type EnCola = Aviso & { id: number; creado: number };
@@ -134,6 +136,11 @@ export function pausarGlobos(pausar: boolean): void {
 export function silenciarGlobos(silenciar: boolean): void {
   silencio = silenciar;
   if (!silenciar) mostrarSiguiente();
+}
+
+/** ¿Hay a la vista un globo que pide atención (una notificación urgente)? */
+export function pideAtencion(): boolean {
+  return actual?.atencion === true;
 }
 
 export function globoActual(): number | null {

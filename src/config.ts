@@ -26,7 +26,7 @@ import {
   type ConfigSonido,
 } from "./ajustes";
 import { buscarCiudad, type Lugar } from "./estado/clima";
-import { preguntarJev } from "./estado/jev";
+import { NOTIFICACIONES_EJEMPLO, importanciaNotificacion, preguntarJev } from "./estado/jev";
 import { campanita } from "./sonido";
 import { guardar, leer } from "./store";
 import { $, escapar } from "./util";
@@ -235,6 +235,54 @@ jevProbar.addEventListener("click", async () => {
   } finally {
     jevProbar.disabled = false;
   }
+});
+
+// Probar el filtro: Jev clasifica notificaciones inventadas, se ve aquí qué decide con cada una
+// y se le pasan al compañero (como si llegaran de Windows) para ver los globos
+const jevEjemplos = $(document, "#jev-ejemplos");
+const jevEjemplosProbar = $<HTMLButtonElement>(document, "#jev-ejemplos-probar");
+const NOMBRE_IMPORTANCIA = { urgente: "Urgente", normal: "Normal", ruido: "Ruido" } as const;
+/** Pausa entre las notificaciones que se pasan al compañero. */
+const ENTRE_EJEMPLOS_MS = 1500;
+
+jevEjemplosProbar.addEventListener("click", async () => {
+  if (!grupos.jev.clave) {
+    jevEstado.textContent = "Pega primero la clave";
+    return;
+  }
+  jevEjemplosProbar.disabled = true;
+  jevEjemplos.hidden = false;
+  jevEjemplos.innerHTML = `<li class="resumen">Preguntando a Jev…</li>`;
+  const resultados = await Promise.all(
+    NOTIFICACIONES_EJEMPLO.map((n) =>
+      importanciaNotificacion(grupos.jev.clave, n).then(
+        (r) => ({ n, ...r, error: "" }),
+        (e: unknown) => ({ n, importancia: null, confianza: 0, error: e instanceof Error ? e.message : "Error" }),
+      ),
+    ),
+  );
+  const aciertos = resultados.filter((r) => r.importancia === r.n.esperado).length;
+  jevEjemplos.innerHTML =
+    resultados
+      .map((r) => {
+        const decision = r.importancia
+          ? `<b class="${r.importancia === r.n.esperado ? "bien" : "mal"}">${NOMBRE_IMPORTANCIA[r.importancia]} · ${Math.round(r.confianza * 100)} %</b>`
+          : `<b class="mal">${escapar(r.error)}</b>`;
+        return `<li><div>${escapar(r.n.titulo)}<small>${escapar(r.n.app)} · ${escapar(r.n.texto)}</small></div>${decision}</li>`;
+      })
+      .join("") +
+    `<li class="resumen">${aciertos} de ${resultados.length} como se esperaba (en naranja, las que no). Con menos del 55 % de confianza, el compañero las trata como normales.</li>`;
+  jevEjemplosProbar.disabled = false;
+  if (!grupos.jev.activo || !grupos.jev.notificaciones) {
+    jevEstado.textContent = "Activa «Usar Jev» y el filtro para ver los globos";
+    return;
+  }
+  // Al compañero, una tras otra (con ids negativos: no existen en Windows)
+  NOTIFICACIONES_EJEMPLO.forEach((n, i) => {
+    window.setTimeout(() => {
+      void emit("notification-new", { id: -(i + 1), app: n.app, icono: null, titulo: n.titulo, texto: n.texto });
+    }, i * ENTRE_EJEMPLOS_MS);
+  });
 });
 
 // ---------- Notificaciones de Windows ----------
