@@ -486,6 +486,8 @@ listen("menu-pomodoro", () => {
   alternarPomodoro();
   gesto("guino", DURACION_GUINO);
 }).catch(console.error);
+// Se intentó abrir la app otra vez: el compañero que ya está saluda
+listen("otra-copia", () => gesto("saludo", 2200)).catch(console.error);
 listen("menu-agua", () => {
   beber();
   gesto("feliz", 1400);

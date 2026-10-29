@@ -12,11 +12,19 @@ mod media;
 #[cfg(target_os = "windows")]
 mod notifications;
 
+use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        // Tiene que ser el primer plugin. Si la app ya está abierta (por ejemplo, arrancó con
+        // Windows y se abre a mano), no aparece un segundo compañero: el que ya está se muestra y saluda
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _carpeta| {
+            app.state::<window::Estado>().visible_usuario.store(true, std::sync::atomic::Ordering::SeqCst);
+            window::aplicar_visibilidad(app);
+            let _ = app.emit("otra-copia", ());
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
