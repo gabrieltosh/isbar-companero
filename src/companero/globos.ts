@@ -30,6 +30,8 @@ let siguienteId = 1;
 const cola: (Aviso & { id: number })[] = [];
 let actual: (Aviso & { id: number }) | null = null;
 let tSiguiente = 0;
+/** Con el panel abierto los globos esperan en la cola. */
+let pausados = false;
 
 function contenido(a: Aviso & { id: number }): ContenidoGlobo {
   return {
@@ -44,7 +46,7 @@ function contenido(a: Aviso & { id: number }): ContenidoGlobo {
 }
 
 function mostrarSiguiente(): void {
-  if (actual || cola.length === 0) return;
+  if (pausados || actual || cola.length === 0) return;
   actual = cola.shift() ?? null;
   if (!actual) return;
   if (actual.gesto) gesto(actual.gesto, DURACION_GESTO);
@@ -75,6 +77,17 @@ export function cerrar(id: number): void {
   const i = cola.findIndex((a) => a.id === id);
   if (i >= 0) cola.splice(i, 1);
   if (actual?.id === id) void emit(EVENTO_CERRAR, { id });
+}
+
+/** Para (o reanuda) los globos; al reanudar sale el siguiente que esperaba. */
+export function pausarGlobos(pausar: boolean): void {
+  pausados = pausar;
+  // Si había uno a la vista, Rust ya lo cerró al abrir el panel: vuelve a la cola
+  if (pausar && actual) {
+    cola.unshift(actual);
+    actual = null;
+  }
+  if (!pausar) mostrarSiguiente();
 }
 
 export function globoActual(): number | null {

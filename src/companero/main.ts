@@ -18,6 +18,7 @@ import {
 import { beber } from "../estado/agua";
 import { alternarPomodoro } from "../estado/pomodoro";
 import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
+import { iniciarPuente } from "./puente";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -320,6 +321,7 @@ function parpadear(): void {
 let tArrastre = 0;
 let pulsado = false;
 let clics: number[] = [];
+let tPanel = 0;
 
 companero.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
@@ -350,17 +352,26 @@ window.addEventListener("pointerup", () => {
     invoke("salir_del_borde").catch(console.error);
     return;
   }
-  // Un clic: guiño. Dos seguidos: risa. Muchos en poco tiempo: se enoja
+  // Un clic: abre o cierra el panel (con un guiño). Dos seguidos: risa. Muchos: se enoja.
+  // El panel espera un momento por si llega un segundo clic
   const ahora = performance.now();
   clics = clics.filter((c) => ahora - c < RAFAGA_MS);
   clics.push(ahora);
+  window.clearTimeout(tPanel);
   if (clics.length >= 4) {
     gesto("enojado", 1800);
     clics = [];
+    invoke("cerrar_panel").catch(console.error);
   } else if (clics.length >= 2 && ahora - clics[clics.length - 2] < DOBLE_CLIC_MS) {
     gesto("risa", 1500);
   } else {
-    gesto("guino", DURACION_GUINO);
+    tPanel = window.setTimeout(() => {
+      invoke<boolean>("alternar_panel")
+        .then((abierto) => {
+          if (abierto) gesto("guino", DURACION_GUINO);
+        })
+        .catch(console.error);
+    }, DOBLE_CLIC_MS);
   }
 });
 
@@ -507,5 +518,6 @@ cursor = { x: centro(), y: centro() };
 // Saluda al aparecer y empieza a escuchar notificaciones, música, Pomodoro, agua y pausas
 gesto("saludo", 2600);
 iniciarAvisos();
+iniciarPuente();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);

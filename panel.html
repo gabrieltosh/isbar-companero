@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/src/panel/panel.css" />
+    <title>isbar</title>
+    <script type="module" src="/src/panel/main.ts"></script>
+  </head>
+
+  <body>
+    <main class="panel">
+      <header class="cabecera">
+        <div>
+          <b id="saludo">Hola</b>
+          <small id="fecha"></small>
+        </div>
+        <button class="icono" id="ajustes" title="Configuración" aria-label="Configuración"></button>
+      </header>
+
+      <nav class="pestanas" role="tablist">
+        <button role="tab" data-vista="inicio" class="activa">Inicio</button>
+        <button role="tab" data-vista="avisos">Avisos <span class="insignia" id="insignia" hidden></span></button>
+        <button role="tab" data-vista="musica">Música</button>
+      </nav>
+
+      <section class="vista activa" data-vista="inicio">
+        <div class="tarjetas">
+          <article class="tarjeta" id="t-pomodoro">
+            <small>Pomodoro · <span class="p-modo"></span></small>
+            <b class="grande p-tiempo">25:00</b>
+            <div class="barra"><i class="p-barra"></i></div>
+            <div class="fila">
+              <button class="boton principal p-alternar"></button>
+              <button class="boton icono-boton p-reiniciar" title="Reiniciar" aria-label="Reiniciar"></button>
+            </div>
+          </article>
+
+          <article class="tarjeta" id="t-agua">
+            <small>Agua · hoy</small>
+            <b class="grande a-litros">0,0 L</b>
+            <div class="barra azul"><i class="a-barra"></i></div>
+            <div class="fila"><button class="boton a-beber"></button></div>
+          </article>
+
+          <article class="tarjeta ancha" id="t-pausas">
+            <div>
+              <small>Pausas activas</small>
+              <b class="pa-proxima"></b>
+            </div>
+            <div class="fila">
+              <button class="boton" data-pausa="postura">Estirar</button>
+              <button class="boton" data-pausa="vista">Descansar la vista</button>
+            </div>
+          </article>
+
+          <article class="tarjeta ancha musica-mini" id="t-musica" hidden>
+            <img class="m-caratula" alt="" />
+            <div class="m-textos">
+              <small>Sonando</small>
+              <b class="m-titulo"></b>
+            </div>
+            <button class="boton icono-boton m-play" data-musica="play" aria-label="Reproducir o pausar"></button>
+          </article>
+        </div>
+      </section>
+
+      <section class="vista" data-vista="avisos">
+        <div class="avisos-cabecera">
+          <small id="avisos-cuenta"></small>
+          <button class="enlace" id="borrar-todo" hidden>Borrar todo</button>
+        </div>
+        <ul class="avisos" id="avisos"></ul>
+      </section>
+
+      <section class="vista" data-vista="musica">
+        <div class="musica" id="musica">
+          <div class="caratula-grande"><img class="mg-caratula" alt="" /></div>
+          <b class="mg-titulo"></b>
+          <small class="mg-artista"></small>
+          <div class="progreso">
+            <span class="mg-pos">0:00</span>
+            <div class="barra"><i class="mg-barra"></i></div>
+            <span class="mg-dur">0:00</span>
+          </div>
+          <div class="controles">
+            <button class="icono-boton" data-musica="anterior" aria-label="Anterior"></button>
+            <button class="icono-boton principal mg-play" data-musica="play" aria-label="Reproducir o pausar"></button>
+            <button class="icono-boton" data-musica="siguiente" aria-label="Siguiente"></button>
+          </div>
+        </div>
+        <p class="vacio" id="sin-musica">No suena nada ahora mismo.</p>
+      </section>
+    </main>
+  </body>
+</html>

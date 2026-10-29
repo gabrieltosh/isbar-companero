@@ -66,6 +66,7 @@ pub fn aplicar_visibilidad(app: &AppHandle) {
     if let Some(globo) = app.get_webview_window(crate::globo::ETIQUETA) {
         fijar_visible(&globo, visible && estado.globo.load(Ordering::SeqCst));
     }
+    crate::panel::al_ocultar_companero(app);
 }
 
 /// Se muestra y oculta directamente con Windows (sin quitar el foco). Para Tauri la ventana

@@ -2,6 +2,7 @@ mod autoarranque;
 mod claude_uso;
 mod companero;
 mod globo;
+mod panel;
 mod tray;
 mod window;
 
@@ -39,6 +40,8 @@ pub fn run() {
         companero::fijar_tamano_companero,
         globo::mostrar_globo,
         globo::ocultar_globo,
+        panel::alternar_panel,
+        panel::cerrar_panel,
         tray::abrir_configuracion_cmd,
         claude_uso::leer_uso_claude,
         autoarranque::autoarranque_activo,
@@ -64,6 +67,8 @@ pub fn run() {
         companero::fijar_tamano_companero,
         globo::mostrar_globo,
         globo::ocultar_globo,
+        panel::alternar_panel,
+        panel::cerrar_panel,
         tray::abrir_configuracion_cmd,
         claude_uso::leer_uso_claude,
         autoarranque::autoarranque_activo,
@@ -75,6 +80,7 @@ pub fn run() {
             // La única ventana es la del compañero; su página la coloca y la muestra
             companero::crear(app.handle())?;
             globo::crear(app.handle())?;
+            panel::crear(app.handle())?;
             tray::crear(app.handle())?;
             window::iniciar_click_through(app.handle().clone());
             claude_uso::iniciar(app.handle().clone());

@@ -202,8 +202,9 @@ pub fn set_companero_rects(estado: tauri::State<'_, Estado>, rects: Vec<Rect>) {
 pub fn arrastrar_companero(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
     let ventana = ventana(&app)?;
     let escala = ventana.scale_factor().map_err(|e| e.to_string())?;
-    // El globo se aparta mientras se mueve
+    // El globo y el panel se apartan mientras se mueve
     crate::globo::ocultar_globo(app.clone());
+    crate::panel::cerrar_panel(app.clone());
     let _ = ventana.emit("globo-cerrar", ());
     thread::spawn(move || {
         let mut vuelta = 0u32;
