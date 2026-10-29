@@ -7,7 +7,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { EVENTO_SISTEMA, duracionLegible, type EstadoSistema } from "../estado/sistema";
-import { iconoClima } from "./clima";
 import { avisar, cerrar } from "./globos";
 import { gesto } from "./vida";
 
@@ -317,16 +316,23 @@ function iconoBateriaBaja(porcentaje: number): string {
   );
 }
 
-/** Lo que lleva sobre la cabeza ahora: la antena (sin internet) y un icono (volumen recién
- * cambiado; si no, poca batería; si no, el paraguas cuando llueve). */
-export function iconoSistema(ahora: number): string {
+/** El icono que lleva sobre la cabeza ahora: volumen recién cambiado o, si no, poca batería. */
+function iconoEncima(ahora: number): string {
   const v = anterior?.volumen;
   const b = anterior?.bateria;
-  let icono = "";
-  if (v && ahora < volumenHasta) icono = iconoVolumen(v.nivel, v.silencio);
-  else if (b && !b.enchufado && b.porcentaje <= BATERIA_BAJA) icono = iconoBateriaBaja(b.porcentaje);
-  else icono = iconoClima(ahora);
-  return dibujarAntena(ahora) + icono;
+  if (v && ahora < volumenHasta) return iconoVolumen(v.nivel, v.silencio);
+  if (b && !b.enchufado && b.porcentaje <= BATERIA_BAJA) return iconoBateriaBaja(b.porcentaje);
+  return "";
+}
+
+/** ¿Hay un icono sobre la cabeza? (tiene prioridad sobre el paraguas) */
+export function hayIconoSistema(ahora: number): boolean {
+  return iconoEncima(ahora) !== "";
+}
+
+/** Lo que lleva sobre la cabeza ahora: la antena (sin internet) y el icono, si lo hay. */
+export function iconoSistema(ahora: number): string {
+  return dibujarAntena(ahora) + iconoEncima(ahora);
 }
 
 function revisar(e: EstadoSistema): void {

@@ -6,7 +6,10 @@ import {
   CLIMA_POR_DEFECTO,
   COLORES_COMPANERO,
   COMPANERO_POR_DEFECTO,
+  ESCENAS_PRUEBA,
   EVENTO_AJUSTES,
+  EVENTO_PROBAR_ESCENA,
+  PARAR_PRUEBA,
   PAUSAS_POR_DEFECTO,
   POMODORO_POR_DEFECTO,
   SONIDO_POR_DEFECTO,
@@ -173,6 +176,15 @@ climaResultados.addEventListener("change", () => {
 });
 climaQuitar.addEventListener("click", () => elegirCiudad(null));
 pintarCiudad();
+
+const climaEscena = $<HTMLSelectElement>(document, "#clima-escena");
+climaEscena.innerHTML = ESCENAS_PRUEBA.map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join("");
+$(document, "#clima-probar").addEventListener("click", () => {
+  emit(EVENTO_PROBAR_ESCENA, climaEscena.value).catch(console.error);
+});
+$(document, "#clima-parar").addEventListener("click", () => {
+  emit(EVENTO_PROBAR_ESCENA, PARAR_PRUEBA).catch(console.error);
+});
 
 // ---------- Notificaciones de Windows ----------
 

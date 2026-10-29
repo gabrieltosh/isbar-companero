@@ -79,3 +79,22 @@ export interface ConfigClima {
 }
 
 export const CLIMA_POR_DEFECTO: ConfigClima = { ciudad: "", latitud: null, longitud: null };
+
+/** Configuración pide al compañero que enseñe una escena del tiempo un rato (para probarla). */
+export const EVENTO_PROBAR_ESCENA = "probar-escena";
+/** Escenas del tiempo que se pueden probar: id y nombre. */
+export const ESCENAS_PRUEBA = [
+  ["lluvia", "Lluvia"],
+  ["tormenta", "Tormenta"],
+  ["amenaza", "Va a llover"],
+  ["nieve", "Nieve"],
+  ["calor", "Calor"],
+  ["frio", "Frío"],
+  ["niebla", "Niebla"],
+  ["nublado", "Nublado"],
+  ["noche", "Noche despejada"],
+  ["amanecer", "Buenos días"],
+] as const;
+export type EscenaPrueba = (typeof ESCENAS_PRUEBA)[number][0];
+/** Lo que se envía con EVENTO_PROBAR_ESCENA para terminar la prueba antes de tiempo. */
+export const PARAR_PRUEBA = "parar";

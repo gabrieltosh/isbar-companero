@@ -23,8 +23,9 @@ import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
-import { iconoSistema, iniciarSistema } from "./sistema";
+import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
+import { dibujarTiempo } from "./tiempo";
 import { iniciarRespuestas } from "./respuestas";
 import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
@@ -77,6 +78,8 @@ interface Soltado extends PosGuardada {
 
 const companero = $(document, "#companero");
 const cara = $(document, "#cara");
+const fondo = $(document, "#fondo");
+const frente = $(document, "#frente");
 
 let config: ConfigCompanero = COMPANERO_POR_DEFECTO;
 let borde = 0;
@@ -134,6 +137,8 @@ const MS_DORMIDO = 1000 / 15;
 const MS_CANSADO = 1000 / 30;
 let ultimoDibujo = 0;
 let dibujoCara = "";
+let dibujoFondo = "";
+let dibujoFrente = "";
 
 function fotograma(ahora: number): void {
   const lento = !arrastrando && !encima && !morph;
@@ -166,6 +171,17 @@ function fotograma(ahora: number): void {
   }
   expresionActual = expresion;
   progresoActual = progreso;
+  // El tiempo que hace: escenas alrededor, y a veces tirita, entorna los ojos o mira al cielo
+  const tiempo = dibujarTiempo(ahora, {
+    pose,
+    color: config.color,
+    tranquilo: config.tranquilo,
+    dormido: expresion === "dormido",
+    caraLibre: expresion === "normal" || expresion === "silba",
+    oculto: borde !== 0,
+    arrastrando,
+    icono: hayIconoSistema(ahora),
+  });
   // Con música que se oye, baila al pulso de la canción; sin volumen (o en silencio), no
   const conRitmo = expresion === "musica" && hayAudio();
   let objetivoBaile = SIN_BAILE;
@@ -260,6 +276,8 @@ function fotograma(ahora: number): void {
     giroCursor = (vx / d) * 7 * cerca;
     inclinaX = (vx / d) * 3 * cerca;
     inclinaY = (vy / d) * 2 * cerca;
+  } else if (libre && tiempo.mira) {
+    ({ x: miraX, y: miraY } = tiempo.mira);
   } else if (libre && rutina === "mira") {
     if (ahora > cambioMirada) {
       miradaLibre = { x: (Math.random() * 2 - 1) * 3.5, y: (Math.random() * 2 - 1) * 2.5 };
@@ -411,7 +429,7 @@ function fotograma(ahora: number): void {
   const agarre = arrastrando ? 1.12 : 1;
   const sx = respira * agarre * escalaX * estiraX * baile.sx;
   const sy = respira * agarre * escalaY * estiraY * baile.sy;
-  const tx = inclinacion.x + baile.x;
+  const tx = inclinacion.x + baile.x + tiempo.temblor;
   const ty = inclinacion.y + baile.y;
   const rot = paseo.angulo + baile.rot;
   companero.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
@@ -419,10 +437,18 @@ function fotograma(ahora: number): void {
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
   // Solo se reescribe la cara si ha cambiado algo
-  const dibujo = anilloPomodoro() + dibujarConMorph(ahora) + iconoSistema(ahora);
+  const dibujo = anilloPomodoro() + dibujarConMorph(ahora, tiempo.entorna) + tiempo.cuerpo + iconoSistema(ahora);
   if (dibujo !== dibujoCara) {
     cara.innerHTML = dibujo;
     dibujoCara = dibujo;
+  }
+  if (tiempo.fondo !== dibujoFondo) {
+    fondo.innerHTML = tiempo.fondo;
+    dibujoFondo = tiempo.fondo;
+  }
+  if (tiempo.frente !== dibujoFrente) {
+    frente.innerHTML = tiempo.frente;
+    dibujoFrente = tiempo.frente;
   }
   requestAnimationFrame(fotograma);
 }
@@ -442,22 +468,24 @@ function anilloPomodoro(): string {
 /** Curva de aceleración suave al empezar y al terminar. */
 const suavizar = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** La cara actual: durante un cambio, los rasgos se transforman y los extras se funden. */
-function dibujarConMorph(ahora: number): string {
+/** La cara actual: durante un cambio, los rasgos se transforman y los extras se funden.
+ * `entorna` (0 a 1) entrecierra los ojos (con niebla). */
+function dibujarConMorph(ahora: number, entorna: number): string {
   const c = config.color;
+  const p = entorna > 0.01 ? { ...pose, parpadeo: Math.max(pose.parpadeo, entorna) } : pose;
   const objetivo = rasgosDe(expresionActual, ahora, progresoActual, pose.musica);
-  const extrasNuevos = dibujarExtras(expresionActual, ahora, progresoActual, pose, c);
+  const extrasNuevos = dibujarExtras(expresionActual, ahora, progresoActual, p, c);
   if (!morph) {
     rasgosVistos = objetivo;
-    return dibujarCara(objetivo, pose, c) + extrasNuevos;
+    return dibujarCara(objetivo, p, c) + extrasNuevos;
   }
   const k = Math.min(1, (ahora - morph.inicio) / DURACION_MORPH);
   const e = suavizar(k);
   rasgosVistos = mezclar(morph.desde, objetivo, e);
-  const extrasViejos = dibujarExtras(morph.extras, ahora, morph.progresoExtras, pose, c);
+  const extrasViejos = dibujarExtras(morph.extras, ahora, morph.progresoExtras, p, c);
   if (k >= 1) morph = null;
   return (
-    dibujarCara(rasgosVistos, pose, c) +
+    dibujarCara(rasgosVistos, p, c) +
     (extrasViejos ? `<g opacity="${(1 - e).toFixed(3)}">${extrasViejos}</g>` : "") +
     (extrasNuevos ? `<g opacity="${e.toFixed(3)}">${extrasNuevos}</g>` : "")
   );

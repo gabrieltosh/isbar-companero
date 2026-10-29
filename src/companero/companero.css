@@ -44,3 +44,12 @@ body {
   height: 100%;
   overflow: visible;
 }
+
+/* Capas del tiempo: ocupan toda la ventana (compañero y margen) y no reciben clics */
+.tiempo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

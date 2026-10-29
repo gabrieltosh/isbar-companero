@@ -22,9 +22,8 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 **Siguiente**, en este orden:
 1. ~~**Clima**~~ ✅ (Open-Meteo, ciudad en Configuración): saludo de buenos días con el tiempo del
    día y paraguas si va a llover. Probado en Windows con la API real: funciona.
-2. **Animaciones del tiempo**: hoy solo hay un paraguas pequeño sobre la cabeza y se queda corto.
-   El compañero tiene que *vivir* el tiempo con el cuerpo y la cara, no llevar un icono. Ver
-   «Animaciones del tiempo» en la fase 6.
+2. ~~**Animaciones del tiempo**~~ ✅ (`tiempo.ts`): cada tiempo tiene su escena (ver fase 6).
+   Probadas en una página de prueba; falta verlas en Windows con el tiempo real.
 3. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
 4. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
    gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
@@ -39,7 +38,7 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 | 3. Globos, notificaciones y música | Hecha |
 | 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
 | 5. Asistente | Pendiente |
-| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; animaciones del tiempo, no molestar y lo del día pendientes |
+| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; sistema, tiempo y sus animaciones hechos; no molestar y lo del día pendientes |
 | 7. Pulido y publicación | Pendiente |
 
 ## Diseño acordado
@@ -84,8 +83,8 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
   Canta con el volumen; notas al ritmo; globo con la canción al cambiar de pista. Sin volumen,
   no baila.
 - **Estado sobre la cabeza**: progreso del Pomodoro en el borde; sin internet, una antena (busca
-  señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño; si llueve
-  o va a llover, un paraguas azul (con gotas mientras llueve).
+  señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño (tiene
+  prioridad sobre el paraguas). El tiempo se vive con escenas alrededor (ver fase 6).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
 
 ## Preparar un equipo para desarrollar
@@ -187,33 +186,38 @@ Cada fase termina con algo que funciona y se puede probar.
   (≥ 60 %) o ya llueve, lo avisa una vez y lleva un paraguas sobre la cabeza. Al elegir ciudad,
   cuenta el tiempo de allí. El panel enseña la temperatura junto a la fecha.
   Se pide desde el frontend: Rust no tiene cliente HTTP y añadirlo sería una dependencia nueva.
-- **Animaciones del tiempo** (siguiente). El paraguas fijo encima se queda corto: cada tiempo
+- **Animaciones del tiempo** ✅. Minimalistas y con solo dos colores, como la cara: el LED y el
+  negro del cristal. El tiempo se mira cada 15 min (Open-Meteo renueva el de ahora
+  cada 15). La escena completa sale por ratos: 1,5 min al cambiar el tiempo o al despertarse y
+  45 s cada 12 min; el resto, un detalle discreto (paraguas cerrado, bufanda, gafas,
+  nieve en la cabeza). En Configuración → Tiempo, «Probar escena» enseña cualquiera 20 s.
+  El paraguas fijo encima se queda corto: cada tiempo
   cambia el cuerpo, la cara y lo que pasa alrededor, con transiciones suaves (nada aparece de golpe)
   y respetando el modo tranquilo (menos partículas y movimiento). Todo en SVG dentro del margen de
   la ventana (24 px por lado), sin dependencias nuevas. Un módulo nuevo `src/companero/tiempo.ts`
   dibuja las escenas; `clima.ts` sigue pidiendo el tiempo y avisando.
   - **Lluvia / llovizna**: el paraguas se abre con rebote (se pasa un poco y vuelve) y lo sujeta
     a un lado con el mango bajando hasta el cuerpo; las gotas caen en diagonal, chocan con la
-    tela y salpican, y las de los lados forman un charquito bajo los pies que se agranda. Más
+    tela y salpican (sin charco ni línea de suelo). Más
     gotas cuanto más llueve (llovizna, lluvia, fuerte). Cuando para, cierra el paraguas, lo sacude
     (gotitas que salen volando) y sonríe.
-  - **Va a llover** (aún no llueve): mira al cielo de vez en cuando y una nube gris pasa por
+  - **Va a llover** (aún no llueve): mira al cielo de vez en cuando y una nube pasa por
     encima; el paraguas sale cerrado y lo abre al empezar la lluvia.
-  - **Tormenta**: como la lluvia, más el cristal que destella con el relámpago, un rayo que cruza
+  - **Tormenta**: como la lluvia, más el borde del cristal que se enciende con el relámpago, un rayo que cruza
     detrás y un susto (sorpresa y tiritón) con cada trueno, cada 8–20 s.
-  - **Nieve**: copos que bajan meciéndose y se van posando hasta formar una capita blanca sobre
+  - **Nieve**: copos que bajan meciéndose y se van posando hasta formar una capa fina sobre
     la cabeza; de vez en cuando se la sacude. Tirita un poco.
   - **Sol con calor** (≥ 28 °C): gafas de sol LED sobre los ojos, gota de sudor que resbala y un
-    brillo que recorre el cristal; a ratos se abanica con una manita.
+    brillo que recorre el cristal.
   - **Frío** (≤ 5 °C): tirita en ráfagas cortas, vaho al respirar (nubecita que sale de la boca y
-    se deshace) y bufanda de rayas.
-  - **Niebla**: bandas de niebla que pasan despacio por delante y lo difuminan; entrecierra los
-    ojos como si no viera.
-  - **Nublado**: una nubecita que pasa por detrás, y a veces se para a hacerle sombra.
+    se deshace) y bufanda lisa (la punta con dos rayas).
+  - **Niebla**: líneas onduladas (≋) que flotan sobre la cabeza y delante del cuerpo y se mecen
+    despacio; entrecierra los ojos como si no viera.
+  - **Nublado**: una nubecita que pasa por detrás, y a veces se para un rato encima.
   - **Despejado de noche**: alguna estrellita que titila a su alrededor.
   - **Buenos días**: el saludo lleva la escena del tiempo de hoy durante unos segundos (sale el sol
     por detrás, o la nube con lluvia), aunque ahora mismo haga otro tiempo.
-  - Las escenas se apagan mientras duerme (solo la capa de nieve y el charquito se quedan), y los
+  - Las escenas se apagan mientras duerme (solo se queda la capa de nieve), y los
     iconos de batería y volumen tienen prioridad sobre lo que lleva encima.
 - Saludo de buenas noches.
 - No molestar.
