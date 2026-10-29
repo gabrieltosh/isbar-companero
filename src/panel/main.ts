@@ -34,6 +34,15 @@ let estado: EstadoPanel | null = null;
 let avisos: Notificacion[] = [];
 
 const ordenar = (o: OrdenPanel) => void emit(EVENTO_ORDEN, o);
+
+/**
+ * Cambia el contenido de un elemento solo si es distinto. El panel se repinta cada medio
+ * segundo: si se reescribiera un botón mientras se pulsa, el clic se perdería.
+ */
+function fijarHtml(el: HTMLElement, html: string): void {
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
 const litros = (ml: number) => (ml / 1000).toFixed(1).replace(".", ",");
 
 // ---------- Cabecera y pestañas ----------
@@ -86,12 +95,12 @@ function pintarInicio(e: EstadoPanel): void {
   $(document, ".p-tiempo").textContent = mmss(p.restante);
   $(document, ".p-barra").style.width = `${Math.min(100, (1 - p.restante / p.duracion) * 100)}%`;
   $(document, "#t-pomodoro").classList.toggle("descanso", p.modo !== "enfoque");
-  $(document, ".p-alternar").innerHTML = p.corriendo ? `${ICONO.pausa}Pausar` : `${ICONO.play}${p.restante < p.duracion ? "Seguir" : "Empezar"}`;
+  fijarHtml($(document, ".p-alternar"), p.corriendo ? `${ICONO.pausa}Pausar` : `${ICONO.play}${p.restante < p.duracion ? "Seguir" : "Empezar"}`);
 
   const a = e.agua;
   $(document, ".a-litros").textContent = `${litros(a.ml)} / ${litros(a.meta)} L`;
   $(document, ".a-barra").style.width = `${Math.min(100, (a.ml / a.meta) * 100)}%`;
-  $(document, ".a-beber").innerHTML = `${ICONO.gota}+${a.sorbo} ml`;
+  fijarHtml($(document, ".a-beber"), `${ICONO.gota}+${a.sorbo} ml`);
 
   const proxima = e.pausas.proxima;
   $(document, ".pa-proxima").textContent =
@@ -109,7 +118,7 @@ function pintarInicio(e: EstadoPanel): void {
     if (m.caratula && caratula.src !== m.caratula) caratula.src = m.caratula;
     caratula.style.visibility = m.caratula ? "visible" : "hidden";
     $(mini, ".m-titulo").textContent = m.titulo || "Sin título";
-    $(mini, ".m-play").innerHTML = m.reproduciendo ? ICONO.pausa : ICONO.play;
+    fijarHtml($(mini, ".m-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
   }
 }
 
@@ -128,7 +137,7 @@ function pintarMusica(e: EstadoPanel): void {
   $(document, ".mg-pos").textContent = mmss(m.posicion);
   $(document, ".mg-dur").textContent = mmss(m.duracionMs);
   $(document, ".mg-barra").style.width = m.duracionMs > 0 ? `${Math.min(100, (m.posicion / m.duracionMs) * 100)}%` : "0%";
-  $(document, ".mg-play").innerHTML = m.reproduciendo ? ICONO.pausa : ICONO.play;
+  fijarHtml($(document, ".mg-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
 }
 
 // ---------- Avisos ----------

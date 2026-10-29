@@ -44,6 +44,10 @@ body {
   }
 }
 
+/* El clic siempre cae en el botón, no en su icono o su texto (que se pueden repintar) */
+button * {
+  pointer-events: none;
+}
 button {
   font: inherit;
   color: inherit;
