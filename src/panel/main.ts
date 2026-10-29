@@ -1,7 +1,9 @@
-// Panel del compañero: Inicio (Pomodoro, agua, pausas, música), Avisos (notificaciones de
-// Windows), Música y Sistema (batería, volumen, conexión y uso del PC). El estado lo tiene el
-// compañero: aquí se pinta su "foto" y se le mandan órdenes. Las notificaciones y el estado
-// del sistema sí se piden directamente a Rust.
+// Panel del compañero: una barra de 7 iconos (la pestaña activa enseña su nombre). Inicio es
+// solo un resumen en tarjetas compactas que llevan a su pestaña (algunas pasan de un dato a otro
+// como un carrusel); Avisos (notificaciones de Windows), Música, Pomodoro, Pausas, Tareas (pronto)
+// y Sistema (batería, volumen, conexión y uso del PC). El estado lo tiene el compañero: aquí se
+// pinta su "foto" y se le mandan órdenes. Las notificaciones y el estado del sistema sí se piden
+// directamente a Rust.
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { $, escapar, mmss } from "../util";
@@ -28,11 +30,30 @@ const ICONO = {
   gota: svg("M12 3.2c3.3 4 6 7.2 6 10.6a6 6 0 0 1-12 0c0-3.4 2.7-6.6 6-10.6z", true),
   ajustes: svg("M4 8h10M18 8h2M4 16h2M10 16h10M16 6v4M8 14v4"),
   cerrar: svg("M7 7l10 10M17 7 7 17"),
+  // Pestañas
+  inicio: svg("M4 11l8-6.5 8 6.5M6 9.5V19h12V9.5"),
+  avisos: svg("M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"),
+  musica: svg("M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"),
+  pomodoro: svg("M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2M10 2.5h4"),
+  pausas: svg("M12 6.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6zM5 9l7 1.5L19 9M12 10.5V15l-3 6M12 15l3 6"),
+  tareas: svg("M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"),
+  sistema: svg("M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"),
   volumen: svg("M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"),
   silencio: svg("M4 9.5h3.5L12 6v12l-4.5-3.5H4zM16 9.5l5 5M21 9.5l-5 5"),
 };
 
 const NOMBRE_MODO = { enfoque: "Enfoque", corto: "Descanso corto", largo: "Descanso largo" } as const;
+/** Pausas: título de su tarjeta y del botón para empezarla. */
+const PAUSA = {
+  postura: { titulo: "Pausa de postura", boton: "Estirar ahora" },
+  vista: { titulo: "Pausa de vista", boton: "Descansar la vista" },
+} as const;
+/** Cada cuánto pasan los datos de las tarjetas carrusel del Inicio. */
+const CARRUSEL_MS = 4000;
+/** Lo que dura el fundido al pasar de un dato a otro. */
+const FUNDIDO_MS = 180;
+/** Con la rueda, como mucho un cambio cada tanto (el touchpad manda muchos giros seguidos). */
+const RUEDA_MS = 350;
 
 let estado: EstadoPanel | null = null;
 let avisos: Notificacion[] = [];
@@ -51,8 +72,6 @@ function fijarHtml(el: HTMLElement, html: string): void {
   el.innerHTML = html;
 }
 
-const litros = (ml: number) => (ml / 1000).toFixed(1).replace(".", ",");
-
 // ---------- Cabecera y pestañas ----------
 
 function pintarCabecera(): void {
@@ -61,19 +80,16 @@ function pintarCabecera(): void {
   $(document, "#fecha").textContent = new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
 }
 
-/** El tiempo de ahora junto a la fecha: "· 18 °C, nublado" (la ciudad, al pasar el ratón). */
-function pintarClima(e: EstadoPanel): void {
-  const el = $(document, "#clima");
-  el.hidden = !e.clima;
-  if (!e.clima) return;
-  el.textContent = ` · ${Math.round(e.clima.temperatura)} °C, ${e.clima.texto.toLowerCase()}`;
-  el.title = e.clima.ciudad;
-}
-
 function irA(vista: string): void {
   document.querySelectorAll<HTMLElement>("[data-vista]").forEach((e) => e.classList.toggle("activa", e.dataset.vista === vista));
   if (vista === "avisos") void cargarAvisos();
 }
+
+// Cada pestaña lleva su icono delante del nombre (el nombre solo se ve en la activa)
+document.querySelectorAll<HTMLElement>(".pestanas [data-vista]").forEach((b) => {
+  const icono = ICONO[b.dataset.vista as keyof typeof ICONO];
+  if (icono) b.insertAdjacentHTML("afterbegin", icono);
+});
 
 $(document, ".pestanas").addEventListener("click", (e) => {
   const boton = (e.target as HTMLElement).closest<HTMLElement>("[data-vista]");
@@ -82,62 +98,283 @@ $(document, ".pestanas").addEventListener("click", (e) => {
 
 const ajustes = $(document, "#ajustes");
 ajustes.innerHTML = ICONO.ajustes;
-ajustes.addEventListener("click", () => {
+const abrirConfiguracion = () => {
   invoke("abrir_configuracion_cmd").catch(console.error);
   invoke("cerrar_panel").catch(console.error);
+};
+ajustes.addEventListener("click", abrirConfiguracion);
+
+// ---------- Inicio: resumen en tarjetas ----------
+
+/** Un dato de una tarjeta del resumen. */
+interface Dato {
+  etiqueta: string;
+  valor: string;
+  detalle?: string;
+  /** Barrita de progreso (0 a 100) y su color */
+  barra?: { pct: number; color: string };
+}
+
+/**
+ * Tarjeta compacta del Inicio. Si tiene varios datos, pasan solos cada CARRUSEL_MS con un
+ * fundido (con puntitos para saber cuál se ve) y se quedan quietos con el ratón encima.
+ * También se pasan a mano: clic en un puntito o rueda del ratón sobre la tarjeta.
+ */
+class Tarjeta {
+  private indice = 0;
+  private encima = false;
+  /** Último giro de rueda que cambió de dato (para no saltar varios de golpe con el touchpad) */
+  private ultimaRueda = 0;
+
+  constructor(
+    private readonly el: HTMLElement,
+    private readonly datos: () => Dato[],
+  ) {
+    el.innerHTML =
+      `<small class="t-etiqueta"></small><b class="t-valor"></b>` +
+      `<div class="barra" hidden><i></i></div><small class="t-detalle"></small><span class="puntos"></span>`;
+    el.addEventListener("mouseenter", () => (this.encima = true));
+    el.addEventListener("mouseleave", () => (this.encima = false));
+    // Clic en un puntito: va a ese dato (y no abre la pestaña)
+    $(el, ".puntos").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = (e.target as HTMLElement).closest<HTMLElement>("[data-i]")?.dataset.i;
+      if (i !== undefined) this.ir(Number(i));
+    });
+    el.addEventListener(
+      "wheel",
+      (e) => {
+        if (this.datos().length < 2) return;
+        e.preventDefault();
+        const ahora = performance.now();
+        if (ahora - this.ultimaRueda < RUEDA_MS || e.deltaY === 0) return;
+        this.ultimaRueda = ahora;
+        this.ir(this.indice + Math.sign(e.deltaY));
+      },
+      { passive: false },
+    );
+  }
+
+  pintar(): void {
+    const lista = this.datos();
+    if (lista.length === 0) return;
+    this.indice %= lista.length;
+    const d = lista[this.indice];
+    $(this.el, ".t-etiqueta").textContent = d.etiqueta;
+    $(this.el, ".t-valor").textContent = d.valor;
+    $(this.el, ".t-detalle").textContent = d.detalle ?? "";
+    const barra = $(this.el, ".barra");
+    barra.hidden = !d.barra;
+    if (d.barra) {
+      const i = $(barra, "i");
+      i.style.width = `${Math.min(100, Math.max(0, d.barra.pct))}%`;
+      i.style.background = d.barra.color;
+    }
+    fijarHtml(
+      $(this.el, ".puntos"),
+      lista.length > 1
+        ? lista
+            .map((d, i) => `<button data-i="${i}" class="${i === this.indice ? "activo" : ""}" title="${escapar(d.etiqueta)}" aria-label="${escapar(d.etiqueta)}"><i></i></button>`)
+            .join("")
+        : "",
+    );
+  }
+
+  /** Pasa solo al siguiente dato (si hay más de uno y el ratón no está encima). */
+  avanzar(): void {
+    if (this.encima || this.datos().length < 2) return;
+    this.ir(this.indice + 1);
+  }
+
+  /** Va al dato `i` (da la vuelta por los extremos) con el fundido. */
+  private ir(i: number): void {
+    const n = this.datos().length;
+    if (n < 2) return;
+    const destino = ((i % n) + n) % n;
+    if (destino === this.indice) return;
+    this.el.classList.add("cambiando");
+    window.setTimeout(() => {
+      this.indice = destino;
+      this.pintar();
+      this.el.classList.remove("cambiando");
+    }, FUNDIDO_MS);
+  }
+}
+
+const pct = (n: number, de: number) => (de > 0 ? (n / de) * 100 : 0);
+
+function datosRecursos(): Dato[] {
+  const u = sistema?.uso;
+  const b = sistema?.bateria;
+  const datos: Dato[] = [];
+  if (u) {
+    datos.push({ etiqueta: "Procesador", valor: `${u.cpu} %`, barra: { pct: u.cpu, color: colorUso(u.cpu) } });
+    datos.push({
+      etiqueta: "Memoria",
+      valor: `${u.memoria} %`,
+      detalle: `${decimal(u.memoriaUsada)} de ${decimal(u.memoriaTotal)} GB`,
+      barra: { pct: u.memoria, color: colorUso(u.memoria) },
+    });
+  }
+  if (b) {
+    const detalle = b.cargando ? "Cargando" : b.enchufado ? "Enchufada" : b.minutosRestantes !== null ? `Quedan ${duracionLegible(b.minutosRestantes)}` : "Con batería";
+    datos.push({
+      etiqueta: "Batería",
+      valor: `${b.porcentaje} %`,
+      detalle,
+      barra: { pct: b.porcentaje, color: b.porcentaje <= 20 && !b.enchufado ? "var(--rojo)" : "var(--verde)" },
+    });
+  }
+  return datos.length > 0 ? datos : [{ etiqueta: "Recursos", valor: "—", detalle: "Leyendo el PC…" }];
+}
+
+function datosPomodoro(): Dato[] {
+  const p = estado?.pomodoro;
+  if (!p) return [{ etiqueta: "Pomodoro", valor: "—" }];
+  const empezado = p.corriendo || p.restante < p.duracion;
+  return [
+    {
+      etiqueta: `Pomodoro · ${NOMBRE_MODO[p.modo]}`,
+      valor: mmss(p.restante),
+      detalle: p.corriendo ? "En marcha" : empezado ? "En pausa" : "Listo para empezar",
+      barra: empezado ? { pct: pct(p.duracion - p.restante, p.duracion), color: p.modo === "enfoque" ? "var(--rojo)" : "var(--verde)" } : undefined,
+    },
+  ];
+}
+
+function datosPausas(): Dato[] {
+  const pa = estado?.pausas;
+  if (!pa) return [{ etiqueta: "Pausas", valor: "—" }];
+  if (pa.modo === "rutina") return [{ etiqueta: "Pausas", valor: "En marcha", detalle: "Síguela en el globo" }];
+  if (!pa.proxima) return [{ etiqueta: "Pausas", valor: "Apagadas", detalle: "Actívalas en Configuración" }];
+  return [{ etiqueta: "Próxima pausa", valor: pa.proxima.nombre, detalle: pa.proxima.cuando }];
+}
+
+function datosAvisos(): Dato[] {
+  const n = avisos.length;
+  if (n === 0) return [{ etiqueta: "Avisos", valor: "Al día", detalle: "Sin notificaciones" }];
+  const ultimo = avisos[0];
+  return [{ etiqueta: n === 1 ? "1 aviso" : `${n} avisos`, valor: ultimo.app, detalle: ultimo.titulo || ultimo.texto }];
+}
+
+function datosTiempo(): Dato[] {
+  const c = estado?.clima;
+  if (!c) return [{ etiqueta: "Tiempo", valor: "—", detalle: "Elige tu ciudad" }];
+  const datos: Dato[] = [
+    { etiqueta: `Ahora · ${c.ciudad}`, valor: `${Math.round(c.temperatura)} °C`, detalle: c.texto },
+    { etiqueta: "Hoy", valor: `${Math.round(c.min)}–${Math.round(c.max)} °C`, detalle: c.ciudad },
+  ];
+  if (c.lluvia) {
+    datos.push({
+      etiqueta: "Va a llover",
+      valor: `${c.lluvia.hora}:00`,
+      detalle: c.lluvia.prob > 0 ? `${c.lluvia.prob} % de probabilidad` : "Lleva paraguas",
+    });
+  }
+  return datos;
+}
+
+const tarjetas = [
+  new Tarjeta($(document, "#r-recursos"), datosRecursos),
+  new Tarjeta($(document, "#r-pomodoro"), datosPomodoro),
+  new Tarjeta($(document, "#r-pausas"), datosPausas),
+  new Tarjeta($(document, "#r-avisos"), datosAvisos),
+  new Tarjeta($(document, "#r-tiempo"), datosTiempo),
+  new Tarjeta($(document, "#r-tareas"), () => [{ etiqueta: "Tareas", valor: "Pronto", detalle: "Tareas y recordatorios" }]),
+];
+window.setInterval(() => tarjetas.forEach((t) => t.avanzar()), CARRUSEL_MS);
+
+// Cada tarjeta lleva a su pestaña; la del tiempo sin ciudad, a Configuración para elegirla
+$(document, ".resumen").addEventListener("click", (e) => {
+  const tarjeta = (e.target as HTMLElement).closest<HTMLElement>(".tarjeta");
+  if (!tarjeta) return;
+  if (tarjeta.dataset.ir) irA(tarjeta.dataset.ir);
+  else if (tarjeta.id === "r-tiempo" && !estado?.clima) abrirConfiguracion();
 });
 
-// ---------- Inicio ----------
+/** Línea de estado sobre las tarjetas, solo cuando hay algo que contar. */
+function pintarEstadoLinea(): void {
+  const partes: string[] = [];
+  const nm = estado?.noMolestar ?? 0;
+  if (nm > 0) partes.push(`No molestar · quedan ${nm < 60 ? `${nm} min` : `${Math.round(nm / 60)} h`}`);
+  if (sistema?.conexion && !sistema.conexion.internet) partes.push("Sin internet");
+  const linea = $(document, "#estado-linea");
+  linea.hidden = partes.length === 0;
+  linea.textContent = partes.join(" · ");
+}
+
+function pintarResumen(): void {
+  tarjetas.forEach((t) => t.pintar());
+  $(document, "#r-tiempo").classList.toggle("sin-enlace", !!estado?.clima);
+  pintarEstadoLinea();
+  const m = estado?.musica;
+  const mini = $(document, "#r-musica");
+  mini.hidden = !m;
+  if (m) {
+    // Sin carátula no deja hueco
+    const caratula = $<HTMLImageElement>(mini, ".m-caratula");
+    if (m.caratula && caratula.src !== m.caratula) caratula.src = m.caratula;
+    caratula.style.display = m.caratula ? "" : "none";
+    // "Sonando · Queen" arriba y la canción debajo
+    $(mini, ".m-estado").textContent = [m.reproduciendo ? "Sonando" : "En pausa", m.artista].filter(Boolean).join(" · ");
+    $(mini, ".m-titulo").textContent = m.titulo || "Sin título";
+  }
+}
+
+// ---------- Pomodoro ----------
 
 $(document, ".p-alternar").addEventListener("click", () => ordenar({ tipo: "pomodoro-alternar" }));
 $(document, ".p-reiniciar").innerHTML = ICONO.reiniciar;
 $(document, ".p-reiniciar").addEventListener("click", () => ordenar({ tipo: "pomodoro-reiniciar" }));
-$(document, ".a-beber").addEventListener("click", () => ordenar({ tipo: "agua-beber" }));
-document.querySelectorAll<HTMLElement>("[data-pausa]").forEach((b) =>
-  b.addEventListener("click", () => {
-    ordenar({ tipo: "pausa-empezar", pausa: b.dataset.pausa as "postura" | "vista" });
-    // La rutina se sigue en el globo del compañero
-    invoke("cerrar_panel").catch(console.error);
-  }),
-);
+$(document, ".modos").addEventListener("click", (e) => {
+  const modo = (e.target as HTMLElement).closest<HTMLElement>("[data-modo]")?.dataset.modo;
+  if (modo === "enfoque" || modo === "corto" || modo === "largo") ordenar({ tipo: "pomodoro-modo", modo });
+});
+
+function pintarPomodoro(e: EstadoPanel): void {
+  const p = e.pomodoro;
+  document.querySelectorAll<HTMLElement>("[data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === p.modo));
+  $(document, ".p-tiempo").textContent = mmss(p.restante);
+  $(document, ".p-barra").style.width = `${Math.min(100, (1 - p.restante / p.duracion) * 100)}%`;
+  $(document, "#pomodoro").classList.toggle("descanso", p.modo !== "enfoque");
+  $(document, ".p-ciclos").textContent = p.ciclos === 0 ? "Aún no has terminado ningún bloque" : p.ciclos === 1 ? "1 bloque de enfoque terminado" : `${p.ciclos} bloques de enfoque terminados`;
+  fijarHtml($(document, ".p-alternar"), p.corriendo ? `${ICONO.pausa}Pausar` : `${ICONO.play}${p.restante < p.duracion ? "Seguir" : "Empezar"}`);
+}
+
+// ---------- Pausas ----------
+
+$(document, "#pa-tipos").addEventListener("click", (e) => {
+  const tipo = (e.target as HTMLElement).closest<HTMLElement>("[data-pausa]")?.dataset.pausa;
+  if (tipo !== "postura" && tipo !== "vista") return;
+  ordenar({ tipo: "pausa-empezar", pausa: tipo });
+  // La rutina se sigue en el globo del compañero
+  invoke("cerrar_panel").catch(console.error);
+});
+
+function pintarPausas(e: EstadoPanel): void {
+  const enRutina = e.pausas.modo === "rutina";
+  $(document, "#pa-rutina").hidden = !enRutina;
+  fijarHtml(
+    $(document, "#pa-tipos"),
+    e.pausas.tipos
+      .map(
+        (t) => `<article class="tarjeta ancha">
+          <small>${PAUSA[t.tipo].titulo}</small>
+          <b class="pa-cuando">${t.activa ? `Toca ${escapar(t.cuando)}` : "Recordatorio apagado"}</b>
+          <div class="fila"><button class="boton" data-pausa="${t.tipo}" ${enRutina ? "disabled" : ""}>${PAUSA[t.tipo].boton}</button></div>
+        </article>`,
+      )
+      .join(""),
+  );
+}
+
+// ---------- Música: botones ----------
+
 document.querySelectorAll<HTMLElement>("[data-musica]").forEach((b) =>
   b.addEventListener("click", () => ordenar({ tipo: "musica", accion: b.dataset.musica as "anterior" | "play" | "siguiente" })),
 );
 $(document, '.controles [data-musica="anterior"]').innerHTML = ICONO.anterior;
 $(document, '.controles [data-musica="siguiente"]').innerHTML = ICONO.siguiente;
-
-function pintarInicio(e: EstadoPanel): void {
-  const p = e.pomodoro;
-  $(document, ".p-modo").textContent = NOMBRE_MODO[p.modo];
-  $(document, ".p-tiempo").textContent = mmss(p.restante);
-  $(document, ".p-barra").style.width = `${Math.min(100, (1 - p.restante / p.duracion) * 100)}%`;
-  $(document, "#t-pomodoro").classList.toggle("descanso", p.modo !== "enfoque");
-  fijarHtml($(document, ".p-alternar"), p.corriendo ? `${ICONO.pausa}Pausar` : `${ICONO.play}${p.restante < p.duracion ? "Seguir" : "Empezar"}`);
-
-  const a = e.agua;
-  $(document, ".a-litros").textContent = `${litros(a.ml)} / ${litros(a.meta)} L`;
-  $(document, ".a-barra").style.width = `${Math.min(100, (a.ml / a.meta) * 100)}%`;
-  fijarHtml($(document, ".a-beber"), `${ICONO.gota}+${a.sorbo} ml`);
-
-  const proxima = e.pausas.proxima;
-  $(document, ".pa-proxima").textContent =
-    e.pausas.modo === "rutina"
-      ? "Rutina en marcha"
-      : proxima
-        ? `${proxima.nombre} ${proxima.cuando}`
-        : "Sin recordatorios activados";
-
-  const m = e.musica;
-  const mini = $(document, "#t-musica");
-  mini.hidden = !m;
-  if (m) {
-    const caratula = $<HTMLImageElement>(mini, ".m-caratula");
-    if (m.caratula && caratula.src !== m.caratula) caratula.src = m.caratula;
-    caratula.style.visibility = m.caratula ? "visible" : "hidden";
-    $(mini, ".m-titulo").textContent = m.titulo || "Sin título";
-    fijarHtml($(mini, ".m-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
-  }
-}
 
 // ---------- Música ----------
 
@@ -234,6 +471,7 @@ function pintarAvisos(): void {
             </li>`,
           )
           .join("");
+  pintarResumen();
 }
 
 async function cargarAvisos(): Promise<void> {
@@ -335,6 +573,7 @@ function pintarSistema(): void {
     memoria.style.background = colorUso(u.memoria);
     $(document, ".s-u-memoria-gb").textContent = `${decimal(u.memoriaUsada)} de ${decimal(u.memoriaTotal)} GB`;
   }
+  pintarResumen();
 }
 
 const nivelVolumen = $<HTMLInputElement>(document, ".s-v-nivel");
@@ -364,9 +603,10 @@ listen<EstadoSistema>(EVENTO_SISTEMA, ({ payload }) => {
 
 listen<EstadoPanel>(EVENTO_ESTADO, ({ payload }) => {
   estado = payload;
-  pintarInicio(payload);
+  pintarResumen();
+  pintarPomodoro(payload);
+  pintarPausas(payload);
   pintarMusica(payload);
-  pintarClima(payload);
 }).catch(console.error);
 
 listen<boolean>(EVENTO_VISIBLE, ({ payload }) => {
@@ -392,4 +632,4 @@ pintarCabecera();
 void emit(EVENTO_PEDIR);
 void cargarAvisos();
 void cargarSistema();
-if (estado) pintarInicio(estado);
+pintarResumen();

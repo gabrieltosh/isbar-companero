@@ -14,25 +14,36 @@ export interface EstadoPanel {
     duracion: number;
     ciclos: number;
   };
-  agua: { ml: number; meta: number; sorbo: number };
   pausas: {
     /** "reposo", "pendiente", "rutina" o "fin" */
     modo: string;
     /** La próxima pausa activada, o null si están todas apagadas */
     proxima: { tipo: TipoPausa; nombre: string; cuando: string } | null;
+    /** Cada tipo de pausa: si está activada y cuándo toca */
+    tipos: { tipo: TipoPausa; nombre: string; activa: boolean; cuando: string }[];
   };
   musica: (InfoMedia & { posicion: number }) | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
   ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null;
   /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
-  clima: { temperatura: number; texto: string; ciudad: string } | null;
+  clima: {
+    temperatura: number;
+    texto: string;
+    ciudad: string;
+    /** Mínima y máxima de hoy (°C) */
+    min: number;
+    max: number;
+    /** Si va a llover en las próximas horas: a qué hora y con qué probabilidad (%) */
+    lluvia: { hora: number; prob: number } | null;
+  } | null;
+  /** Minutos que quedan de «No molestar» (0 si no está activo) */
+  noMolestar: number;
 }
 
 export type OrdenPanel =
   | { tipo: "pomodoro-alternar" }
   | { tipo: "pomodoro-reiniciar" }
   | { tipo: "pomodoro-modo"; modo: Modo }
-  | { tipo: "agua-beber" }
   | { tipo: "pausa-empezar"; pausa: TipoPausa }
   | { tipo: "musica"; accion: "anterior" | "play" | "siguiente" }
   | { tipo: "musica-posicion"; ms: number };

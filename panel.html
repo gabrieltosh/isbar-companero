@@ -14,56 +14,38 @@
         <div>
           <b id="saludo">Hola</b>
           <small id="fecha"></small>
-          <small id="clima" hidden></small>
         </div>
         <button class="icono" id="ajustes" title="Configuración" aria-label="Configuración"></button>
       </header>
 
+      <!-- Barra de 7 iconos: la pestaña activa enseña también su nombre (los iconos los pone main.ts) -->
       <nav class="pestanas" role="tablist">
-        <button role="tab" data-vista="inicio" class="activa">Inicio</button>
-        <button role="tab" data-vista="avisos">Avisos <span class="insignia" id="insignia" hidden></span></button>
-        <button role="tab" data-vista="musica">Música</button>
-        <button role="tab" data-vista="sistema">Sistema</button>
+        <button role="tab" data-vista="inicio" class="activa" title="Inicio"><span class="nombre">Inicio</span></button>
+        <button role="tab" data-vista="avisos" title="Avisos"><span class="nombre">Avisos</span><span class="insignia" id="insignia" hidden></span></button>
+        <button role="tab" data-vista="musica" title="Música"><span class="nombre">Música</span></button>
+        <button role="tab" data-vista="pomodoro" title="Pomodoro"><span class="nombre">Pomodoro</span></button>
+        <button role="tab" data-vista="pausas" title="Pausas"><span class="nombre">Pausas</span></button>
+        <button role="tab" data-vista="tareas" title="Tareas"><span class="nombre">Tareas</span></button>
+        <button role="tab" data-vista="sistema" title="Sistema"><span class="nombre">Sistema</span></button>
       </nav>
 
+      <!-- Inicio: solo un resumen. Cada tarjeta lleva a su pestaña; algunas son carruseles -->
       <section class="vista activa" data-vista="inicio">
-        <div class="tarjetas">
-          <article class="tarjeta" id="t-pomodoro">
-            <small>Pomodoro · <span class="p-modo"></span></small>
-            <b class="grande p-tiempo">25:00</b>
-            <div class="barra"><i class="p-barra"></i></div>
-            <div class="fila">
-              <button class="boton principal p-alternar"></button>
-              <button class="boton icono-boton p-reiniciar" title="Reiniciar" aria-label="Reiniciar"></button>
-            </div>
-          </article>
-
-          <article class="tarjeta" id="t-agua">
-            <small>Agua · hoy</small>
-            <b class="grande a-litros">0,0 L</b>
-            <div class="barra azul"><i class="a-barra"></i></div>
-            <div class="fila"><button class="boton a-beber"></button></div>
-          </article>
-
-          <article class="tarjeta ancha" id="t-pausas">
-            <div>
-              <small>Pausas activas</small>
-              <b class="pa-proxima"></b>
-            </div>
-            <div class="fila">
-              <button class="boton" data-pausa="postura">Estirar</button>
-              <button class="boton" data-pausa="vista">Descansar la vista</button>
-            </div>
-          </article>
-
-          <article class="tarjeta ancha musica-mini" id="t-musica" hidden>
+        <p class="estado-linea" id="estado-linea" hidden></p>
+        <div class="tarjetas resumen">
+          <article class="tarjeta mini" id="r-recursos" data-ir="sistema"></article>
+          <article class="tarjeta mini" id="r-pomodoro" data-ir="pomodoro"></article>
+          <article class="tarjeta mini" id="r-pausas" data-ir="pausas"></article>
+          <article class="tarjeta mini" id="r-avisos" data-ir="avisos"></article>
+          <article class="tarjeta mini ancha musica-mini" id="r-musica" data-ir="musica" hidden>
             <img class="m-caratula" alt="" />
             <div class="m-textos">
-              <small>Sonando</small>
+              <small class="m-estado"></small>
               <b class="m-titulo"></b>
             </div>
-            <button class="boton icono-boton m-play" data-musica="play" aria-label="Reproducir o pausar"></button>
           </article>
+          <article class="tarjeta mini" id="r-tiempo"></article>
+          <article class="tarjeta mini" id="r-tareas" data-ir="tareas"></article>
         </div>
       </section>
 
@@ -93,6 +75,32 @@
           <small class="mg-ritmo" hidden></small>
         </div>
         <p class="vacio" id="sin-musica">No suena nada ahora mismo.</p>
+      </section>
+
+      <section class="vista" data-vista="pomodoro">
+        <div class="pomodoro" id="pomodoro">
+          <div class="modos" role="radiogroup" aria-label="Modo">
+            <button data-modo="enfoque">Enfoque</button>
+            <button data-modo="corto" title="Descanso corto">Corto</button>
+            <button data-modo="largo" title="Descanso largo">Largo</button>
+          </div>
+          <b class="reloj p-tiempo">25:00</b>
+          <div class="barra"><i class="p-barra"></i></div>
+          <small class="p-ciclos"></small>
+          <div class="fila">
+            <button class="boton principal p-alternar"></button>
+            <button class="boton icono-boton p-reiniciar" title="Reiniciar" aria-label="Reiniciar"></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="vista" data-vista="pausas">
+        <p class="estado-linea" id="pa-rutina" hidden>Rutina en marcha: síguela en el globo del compañero.</p>
+        <div class="tarjetas" id="pa-tipos"></div>
+      </section>
+
+      <section class="vista" data-vista="tareas">
+        <p class="vacio">Pronto podrás apuntar aquí tus tareas y recordatorios.</p>
       </section>
 
       <section class="vista" data-vista="sistema">

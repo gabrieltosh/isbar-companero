@@ -1,7 +1,6 @@
-// Puente con el panel: el compañero tiene el estado (Pomodoro, agua, pausas, música) y se lo
+// Puente con el panel: el compañero tiene el estado (Pomodoro, pausas, música, tiempo) y se lo
 // manda al panel mientras está abierto; el panel le devuelve órdenes.
 import { emit, listen } from "@tauri-apps/api/event";
-import { beber, configAgua, mlHoy } from "../estado/agua";
 import {
   cancionAnterior,
   cancionSiguiente,
@@ -30,9 +29,9 @@ import {
 import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoPanel, type OrdenPanel } from "../panel/tipos";
 import { resumenClima } from "./clima";
 import { pausarGlobos } from "./globos";
+import { minutosNoMolestar } from "./noMolestar";
 import { resumenRitmo } from "./ritmo";
 import { responder, responderMusica } from "./respuestas";
-import { gesto } from "./vida";
 
 /** Mientras el panel está abierto, cada cuánto se le manda el estado (relojes, música…). */
 const REFRESCO_MS = 500;
@@ -45,16 +44,22 @@ function foto(): EstadoPanel {
   const info = infoMusica();
   return {
     pomodoro: { modo: p.modo, corriendo: p.corriendo, restante: restante(), duracion: duracion(p.modo), ciclos: p.ciclos },
-    agua: { ml: mlHoy(), meta: configAgua().meta, sorbo: configAgua().sorbo },
     pausas: {
       modo: estadoPausas().modo,
       proxima: proximo
         ? { tipo: proximo, nombre: NOMBRE_PAUSA[proximo], cuando: cuandoPausa(proximaPausa(proximo)) }
         : null,
+      tipos: TIPOS_PAUSA.map((tipo) => ({
+        tipo,
+        nombre: NOMBRE_PAUSA[tipo],
+        activa: pausaActiva(tipo),
+        cuando: cuandoPausa(proximaPausa(tipo)),
+      })),
     },
     musica: info ? { ...info, posicion: posicionMusica() } : null,
     ritmo: resumenRitmo(),
     clima: resumenClima(),
+    noMolestar: minutosNoMolestar(),
   };
 }
 
@@ -75,10 +80,6 @@ function ejecutar(orden: OrdenPanel): void {
       break;
     case "pomodoro-modo":
       cambiarModo(orden.modo);
-      break;
-    case "agua-beber":
-      beber();
-      gesto(mlHoy() >= configAgua().meta ? "celebra" : "feliz", 1600);
       break;
     case "pausa-empezar":
       responder("si");

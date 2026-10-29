@@ -42,9 +42,16 @@ let avisadaLluvia = false;
 const ciudadCorta = (c: string) => c.split(",")[0];
 
 /** El tiempo de ahora para el panel. */
-export function resumenClima(): { temperatura: number; texto: string; ciudad: string } | null {
+export function resumenClima() {
   if (!actual) return null;
-  return { temperatura: actual.temperatura, texto: describirCielo(actual.codigo).texto, ciudad: ciudadCorta(actual.ciudad) };
+  return {
+    temperatura: actual.temperatura,
+    texto: describirCielo(actual.codigo).texto,
+    ciudad: ciudadCorta(actual.ciudad),
+    min: actual.hoy.min,
+    max: actual.hoy.max,
+    lluvia: actual.lluviaPronto,
+  };
 }
 
 function hayCiudad(c: ConfigClima): boolean {

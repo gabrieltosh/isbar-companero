@@ -89,33 +89,65 @@ svg {
   color: var(--texto);
 }
 
+/* Barra de 7 iconos: la activa se ensancha y enseña su nombre */
 .pestanas {
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 4px;
   padding: 0 14px 10px;
 }
 .pestanas button {
-  padding: 5px 11px;
+  position: relative;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 7px;
   border-radius: 10px;
   background: #2a2a30;
   color: #c9c9d0;
   font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: background 160ms, color 160ms;
+}
+.pestanas button:hover {
+  background: var(--boton-hover);
+  color: var(--texto);
+}
+.pestanas svg {
+  flex: none;
+}
+.pestanas .nombre {
+  display: none;
+  white-space: nowrap;
 }
 .pestanas button.activa {
+  padding: 0 10px 0 8px;
   background: var(--principal);
   color: #111;
 }
+.pestanas button.activa .nombre {
+  display: inline;
+}
+/* Número de avisos: un circulito en la esquina del icono */
 .insignia {
-  display: inline-block;
-  min-width: 16px;
-  padding: 0 4px;
-  margin-left: 3px;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
   border-radius: 8px;
   background: var(--rojo);
   color: #fff;
-  font-size: 10.5px;
-  line-height: 16px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
   text-align: center;
+}
+.insignia[hidden] {
+  display: none;
 }
 
 .vista {
@@ -132,7 +164,103 @@ svg {
   display: block;
 }
 
-/* ---------- Inicio ---------- */
+/* ---------- Inicio: resumen ---------- */
+
+/* Línea de estado (No molestar, sin internet), solo cuando hay algo que contar */
+.estado-linea {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--tarjeta);
+  color: var(--suave);
+  font-size: 11.5px;
+}
+.estado-linea[hidden] {
+  display: none;
+}
+
+/* Tarjetas compactas: el dato clave, sin botones; un clic lleva a su pestaña */
+.tarjeta.mini {
+  position: relative;
+  gap: 1px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 120ms, transform 120ms;
+}
+.tarjeta.mini:hover {
+  background: var(--tarjeta-hover);
+}
+.tarjeta.mini:active {
+  transform: scale(0.98);
+}
+.tarjeta.mini.sin-enlace {
+  cursor: default;
+}
+.tarjeta.mini.sin-enlace:hover {
+  background: var(--tarjeta);
+}
+.tarjeta.mini.sin-enlace:active {
+  transform: none;
+}
+.tarjeta.mini small {
+  font-size: 11px;
+}
+.t-valor {
+  font-size: 17px;
+  line-height: 21px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tarjeta.mini .t-detalle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tarjeta.mini .barra {
+  margin: 2px 0 1px;
+}
+.tarjeta.mini .barra[hidden] {
+  display: none;
+}
+/* Carrusel: los datos cambian con un fundido y unos puntitos dicen cuál se ve */
+.tarjeta.mini > * {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.tarjeta.mini.cambiando > :not(.puntos) {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+/* Los puntitos se pueden pulsar: cada uno tiene una zona de clic mayor que el punto */
+.puntos {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+}
+.puntos button {
+  padding: 5px 2px;
+  display: grid;
+  place-items: center;
+}
+.puntos i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--boton-hover);
+  transition: background 180ms, transform 120ms;
+}
+.puntos button:hover i {
+  background: var(--suave);
+  transform: scale(1.4);
+}
+.puntos button.activo i {
+  background: var(--texto);
+}
+
 
 /* Las tarjetas que no tocan (p. ej. la batería en un PC de sobremesa) no se ven */
 .tarjeta[hidden] {
@@ -212,18 +340,6 @@ svg {
   background: var(--rojo);
   transition: width 300ms ease;
 }
-.barra.azul i {
-  background: var(--azul);
-}
-#t-pomodoro.descanso .barra i {
-  background: var(--verde);
-}
-#t-pausas b {
-  display: block;
-  font-size: 13.5px;
-  font-weight: 600;
-  margin-top: 2px;
-}
 .musica-mini {
   flex-direction: row;
   align-items: center;
@@ -243,12 +359,23 @@ svg {
   flex: 1;
   min-width: 0;
 }
-.m-textos b {
+.m-textos b,
+.m-textos small {
   display: block;
-  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.m-textos b {
+  font-size: 13px;
+}
+.musica-mini {
+  gap: 10px;
+}
+.musica-mini .m-caratula {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
 }
 
 /* ---------- Avisos ---------- */
@@ -513,4 +640,72 @@ svg {
 }
 .punto.regular {
   background: #ffd60a;
+}
+
+/* ---------- Pomodoro ---------- */
+
+.pomodoro {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding-top: 4px;
+}
+.modos {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--tarjeta);
+}
+.modos button {
+  flex: 1;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--suave);
+  font-size: 12px;
+  transition: background 120ms, color 120ms;
+}
+.modos button:hover {
+  color: var(--texto);
+}
+.modos button.activo {
+  background: var(--boton-hover);
+  color: var(--texto);
+}
+.reloj {
+  margin: 14px 0 4px;
+  text-align: center;
+  font-size: 54px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.pomodoro.descanso .barra i {
+  background: var(--verde);
+}
+.p-ciclos {
+  text-align: center;
+  color: var(--suave);
+  font-size: 12px;
+}
+.pomodoro .fila {
+  margin-top: 6px;
+}
+.pomodoro .boton {
+  height: 34px;
+}
+.pomodoro .icono-boton {
+  width: 40px;
+}
+
+/* ---------- Pausas ---------- */
+
+.pa-cuando {
+  font-size: 15px;
+  font-weight: 600;
+}
+.boton:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

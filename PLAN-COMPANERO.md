@@ -26,8 +26,10 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
    Probadas en una página de prueba; falta verlas en Windows con el tiempo real.
 3. ~~**No molestar**~~ ✅ (`noMolestar.ts`, desde el menú del clic derecho): 30 min, 1 h o hasta
    mañana (7:00). Sin globos ni campanitas; los que esperan respuesta salen al terminar.
-4. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
-   gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
+4. ~~**Panel nuevo**~~ ✅: barra de 7 iconos (la activa muestra su nombre): Inicio, Avisos, Música,
+   Pomodoro, Pausas, Tareas (pronto) y Sistema. Inicio es solo un resumen compacto: tarjetas con el
+   dato clave que llevan a su pestaña; Recursos (CPU, memoria, batería) y Tiempo (ahora, hoy,
+   lluvia) pasan como carrusel cada 4 s. El agua ya no está en el panel (globo y bandeja).
 5. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
 6. **Modo inteligente con Jev** (opcional, cuando haya acceso): ver «Hacerlo más inteligente».
 
@@ -37,7 +39,7 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 | 1. Ventana y movimiento | Hecha |
 | 2. Cara y vida propia | Hecha |
 | 3. Globos, notificaciones y música | Hecha |
-| 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
+| 4. Panel | Hecha: barra de 7 iconos e Inicio como resumen |
 | 5. Asistente | Pendiente |
 | 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; sistema, tiempo y sus animaciones y no molestar hechos; lo del día pendiente |
 | 7. Pulido y publicación | Pendiente |
