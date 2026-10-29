@@ -28,6 +28,9 @@ export type Expresion =
   | "notificacion"
   | "curioso"
   | "juega"
+  | "asiente"
+  | "niega"
+  | "nose"
   | "lupa"
   | "otea"
   | "asoma"
@@ -159,6 +162,21 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
     case "curioso":
       // Un ojo muy abierto y el otro entornado, como quien examina algo; boquita de lado
       return { izq: OJO_GRANDE, der: ojo(9.6, 2, 4, 10, 0, 1), boca: boca(6, -2.4, 2.4, 0, 3, 3) };
+    case "asiente":
+      // Sí: ojos contentos y sonrisa
+      return iguales(OJO_FELIZ, boca(12, -1.5, 4.5, 0, 0, 3));
+    case "niega":
+      // No: ojos cerrados y boca apretada
+      return iguales(OJO_CERRADO, boca(10, -1.2, -1.2, 0, 0, 3));
+    case "nose": {
+      // No sé: una ceja arriba (un ojo más abierto) y boca torcida
+      const k = Math.sin(limitar(progreso, 0, 1) * Math.PI);
+      return {
+        izq: ojo(9.6, 4.8 + k * 1.2, 4.6, 0, 0, -k * 1.5),
+        der: ojo(9.4, 2.6, 4.2, 0, 0, 1),
+        boca: boca(11, -1.4 - k, 1.4 - k, -8 * k, 1, 3),
+      };
+    }
     case "juega":
       // Atento a la pelota, con una sonrisita
       return iguales(ojo(9.8, 4.9, 4.4), boca(10, -1.6, 3.6, 0, 0, 3));
@@ -366,6 +384,12 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
         `<path d="${q}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none"/>` +
         `<circle cx="0" cy="5" r="1.4" ${conBorde(c)}/></g>`
       );
+    }
+    case "nose": {
+      // Las manitas suben a los lados, con las palmas arriba
+      const k = Math.sin(limitar(progreso, 0, 1) * Math.PI);
+      const y = 52 - k * 14;
+      return `<circle cx="${n(-3 - k * 2)}" cy="${n(y)}" r="4.2" ${conBorde(c)}/><circle cx="${n(67 + k * 2)}" cy="${n(y)}" r="4.2" ${conBorde(c)}/>`;
     }
     case "juega": {
       // Una pelotita que bota sobre su cabeza

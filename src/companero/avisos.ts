@@ -3,6 +3,7 @@
 // El estado (estado/*) vive solo en la ventana del compañero: aquí se inicia.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { responder, responderMusica } from "./respuestas";
 import { beber, configAgua, iniciarAgua, mlHoy, recordatorioAgua } from "../estado/agua";
 import {
   cambioCancion,
@@ -93,9 +94,16 @@ function avisarNotificacion(n: Notificacion): void {
       { id: "descartar", texto: "Descartar" },
     ],
     alAccion: (accion) => {
-      if (accion === "abrir" || accion === "toque") void abrir();
+      if (accion === "abrir" || accion === "toque") {
+        responder("si");
+        void abrir();
+      }
       // Se queda en Windows y vuelve a salir dentro de un rato
-      if (accion === "luego") window.setTimeout(() => avisarNotificacion(n), POSPONER_NOTIFICACION);
+      if (accion === "luego") {
+        responder("nose");
+        window.setTimeout(() => avisarNotificacion(n), POSPONER_NOTIFICACION);
+      }
+      // Al borrarla, asiente cuando Windows cuenta un aviso menos (iniciarRespuestas)
       if (accion === "descartar") invoke("eliminar_notificacion", { id: n.id }).catch(console.error);
     },
   });
@@ -159,6 +167,7 @@ function iniciarCanciones(): void {
       duracion: DURACION_CANCION,
       acciones: controlesMusica(info),
       alAccion: (accion) => {
+        responderMusica(accion);
         if (accion === "anterior") cancionAnterior();
         if (accion === "play") reproducirPausar();
         if (accion === "siguiente") cancionSiguiente();
@@ -191,7 +200,11 @@ function iniciarAvisosPomodoro(): void {
         { id: "luego", texto: "Luego" },
       ],
       alAccion: (accion) => {
-        if (accion === "empezar" && !estadoPomodoro().corriendo) alternarPomodoro();
+        if (accion === "empezar" && !estadoPomodoro().corriendo) {
+          responder("si");
+          alternarPomodoro();
+        }
+        if (accion === "luego") responder("nose");
       },
     });
   });
@@ -277,8 +290,14 @@ function iniciarAvisosPausas(): void {
       duracion: 0,
       urgente: true,
       alAccion: (accion) => {
-        if (accion === "detener") detenerPausa();
-        if (accion === "siguiente") siguientePaso();
+        if (accion === "detener") {
+          responder("no");
+          detenerPausa();
+        }
+        if (accion === "siguiente") {
+          responder("si");
+          siguientePaso();
+        }
       },
     });
   });

@@ -23,6 +23,7 @@ import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
+import { iniciarRespuestas } from "./respuestas";
 import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
@@ -169,6 +170,15 @@ function fotograma(ahora: number): void {
     const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
+  } else if (expresion === "asiente") {
+    // El cuerpo acompaña el sí
+    objetivoBaile = { ...SIN_BAILE, y: Math.max(0, Math.sin(progreso * Math.PI * 6)) * 1.5 * (1 - progreso) };
+  } else if (expresion === "niega") {
+    objetivoBaile = { ...SIN_BAILE, rot: Math.sin(progreso * Math.PI * 6) * 4 * (1 - progreso) };
+  } else if (expresion === "nose") {
+    // Hombros arriba: se estira un poco hacia arriba y se encoge de lado
+    const k = Math.sin(progreso * Math.PI);
+    objetivoBaile = { ...SIN_BAILE, sy: 1 + k * 0.06, sx: 1 - k * 0.03, y: -k * 2, rot: k * 4 };
   } else if (expresion === "feliz" && rutina === "baila") {
     // Baila solo, sin música, a su aire
     objetivoBaile = bailar(ahora, ahora / 560, 0.5, 0.35, 560).mov;
@@ -289,6 +299,25 @@ function fotograma(ahora: number): void {
         giro += curioseoActual.ladeo;
         salto = -Math.max(0, Math.sin(progreso * curioseoActual.miradas.length * Math.PI * 2)) * 1.2 * movimiento;
       }
+      break;
+    case "asiente": {
+      // Sí: tres cabeceos hacia abajo, cada vez más suaves
+      const k = 1 - progreso;
+      salto = Math.max(0, Math.sin(progreso * Math.PI * 6)) * 3.2 * k * movimiento;
+      pose.miraY = acercar(pose.miraY, salto * 0.5, 0.4);
+      break;
+    }
+    case "niega": {
+      // No: la cabeza va de un lado a otro, cada vez menos
+      const k = 1 - progreso;
+      const lado = Math.sin(progreso * Math.PI * 6);
+      giro += lado * 13 * k * movimiento;
+      pose.miraX = acercar(pose.miraX, lado * 3 * k, 0.5);
+      break;
+    }
+    case "nose":
+      // No sé: ladea la cabeza
+      giro += Math.sin(progreso * Math.PI) * 10 * movimiento;
       break;
     case "juega": {
       // Cabezazo a la pelota cada vez que baja
@@ -706,6 +735,7 @@ gesto("saludo", 2600);
 iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
+iniciarRespuestas();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);
 

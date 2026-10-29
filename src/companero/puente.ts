@@ -29,6 +29,7 @@ import {
 } from "../estado/pomodoro";
 import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoPanel, type OrdenPanel } from "../panel/tipos";
 import { pausarGlobos } from "./globos";
+import { responder, responderMusica } from "./respuestas";
 import { gesto } from "./vida";
 
 /** Mientras el panel está abierto, cada cuánto se le manda el estado (relojes, música…). */
@@ -60,10 +61,12 @@ function enviar(): void {
 function ejecutar(orden: OrdenPanel): void {
   switch (orden.tipo) {
     case "pomodoro-alternar":
-      if (!estadoPomodoro().corriendo) gesto("guino", 1100);
+      // Empezar: sí; parar: no sé
+      responder(estadoPomodoro().corriendo ? "nose" : "si");
       alternarPomodoro();
       break;
     case "pomodoro-reiniciar":
+      responder("no");
       reiniciarPomodoro();
       break;
     case "pomodoro-modo":
@@ -74,9 +77,11 @@ function ejecutar(orden: OrdenPanel): void {
       gesto(mlHoy() >= configAgua().meta ? "celebra" : "feliz", 1600);
       break;
     case "pausa-empezar":
+      responder("si");
       empezarPausa(orden.pausa);
       break;
     case "musica":
+      responderMusica(orden.accion);
       if (orden.accion === "anterior") cancionAnterior();
       if (orden.accion === "play") reproducirPausar();
       if (orden.accion === "siguiente") cancionSiguiente();
