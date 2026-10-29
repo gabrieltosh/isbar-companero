@@ -23,6 +23,7 @@ import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
+import { iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarRespuestas } from "./respuestas";
 import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
@@ -186,6 +187,11 @@ function fotograma(ahora: number): void {
   } else if (expresion === "feliz" && rutina === "baila") {
     // Baila solo, sin música, a su aire
     objetivoBaile = bailar(ahora, ahora / 560, 0.5, 0.35, 560).mov;
+  } else if (expresion === "buscasenal") {
+    // De puntillas, inclinándose a un lado y a otro como quien busca cobertura
+    const k = Math.sin(ahora / 280);
+    objetivoBaile = { ...SIN_BAILE, rot: k * 7, x: k * 2, y: -1.5 - Math.abs(k) * 1.5, sy: 1.03 };
+    pararBaile();
   } else if (rutina === "lados" && expresion === "normal") {
     // Estira hacia un lado y hacia el otro, despacio
     const k = Math.sin(ahora / 1100);
@@ -240,6 +246,11 @@ function fotograma(ahora: number): void {
     inclinaX = miraX * 0.9;
     inclinaY = miraY * 0.6;
     giroCursor = miraX * 2.5;
+  } else if (expresion === "buscasenal") {
+    // Mira hacia su antena (arriba a la derecha), siguiéndola mientras busca señal
+    miraX = 2.5 + Math.sin(ahora / 280) * 1.5;
+    miraY = -3.5;
+    giroCursor = 5 + Math.sin(ahora / 280) * 4;
   } else if (borde !== 0) {
     miraX = -borde * 3.5;
   } else if (libre && cerca > 0) {
@@ -407,7 +418,7 @@ function fotograma(ahora: number): void {
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
   // Solo se reescribe la cara si ha cambiado algo
-  const dibujo = anilloPomodoro() + dibujarConMorph(ahora);
+  const dibujo = anilloPomodoro() + dibujarConMorph(ahora) + iconoSistema(ahora);
   if (dibujo !== dibujoCara) {
     cara.innerHTML = dibujo;
     dibujoCara = dibujo;
@@ -745,6 +756,7 @@ gesto("saludo", 2600);
 iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
+iniciarSistema();
 iniciarRespuestas();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);

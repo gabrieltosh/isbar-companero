@@ -35,7 +35,9 @@ export type Expresion =
   | "otea"
   | "asoma"
   | "frustrado"
-  | "impresionado";
+  | "impresionado"
+  /** Sin internet: mira hacia su antena buscando señal */
+  | "buscasenal";
 
 /** Un ojo: ancho, altura de la curva de arriba y de abajo (negativa = sube: "^"), giro y posición. */
 export interface Ojo {
@@ -185,6 +187,9 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
     case "lupa":
       // Examina con una lupa: el ojo de detrás del cristal se ve enorme
       return { izq: ojo(8.6, 3.6, 4.2, 0, 0, 1), der: ojo(13.4, 6.8, 6.8), boca: boca(7, -1, -1, 0, -2, 3) };
+    case "buscasenal":
+      // Ojos muy abiertos mirando hacia la antena y boquita concentrada, de lado
+      return iguales(ojo(10.4, 5, 3), boca(6, -1.6, 2.2, 0, 1.5, 3));
     case "otea":
       // Mano de visera y ojos entornados, como quien mira a lo lejos
       return iguales(ojo(10, 1.8, 4, 0, 0, 1), boca(8, -1.6, 1.6, 0, 0, 3));

@@ -7,11 +7,25 @@ Es un **proyecto propio** (`isbar-companero`, identificador `com.isbar.companero
 isla (`isbar`). Reutiliza su base: notificaciones, música, Pomodoro, agua, pausas, ajustes y
 sonidos.
 
+## Principio
+
+**El compañero reacciona a todo lo que pasa o puede saber**: lo que hace el usuario, los cambios
+de configuración y el estado del PC (música, avisos, internet, batería, volumen, uso…). Cada
+función nueva llega con su reacción (cara, gesto, globo o algo que lleva encima), no solo con una
+tarjeta en el panel. Sin ser pesado: los cambios breves se ignoran y cada aviso sale una vez.
+
 ## Estado actual
 
-**Hechas: fases 0 a 4**, más muchas mejoras pedidas por el camino (ver «Añadido fuera del plan»).
-**Siguiente: fase 5 (asistente).** Reconocimiento de la música: mejoras 1 a 9 hechas; falta
-afinarlas con canciones reales.
+**Hechas: fases 0 a 4**, el reconocimiento de la música (mejoras 1 a 9) y la **primera parte de
+la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan».
+
+**Siguiente**, en este orden:
+1. **Clima** (Open-Meteo, ciudad en Configuración) con sus reacciones: saludo por la mañana con el
+   tiempo del día, paraguas si va a llover.
+2. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
+3. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
+   gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
+4. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
 
 | Fase | Estado |
 |---|---|
@@ -19,14 +33,15 @@ afinarlas con canciones reales.
 | 1. Ventana y movimiento | Hecha |
 | 2. Cara y vida propia | Hecha |
 | 3. Globos, notificaciones y música | Hecha |
-| 4. Panel (Inicio, Avisos, Música) | Hecha; Recordatorios y Chat pasan a la fase 5 |
+| 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
 | 5. Asistente | Pendiente |
-| 6. Estado del sistema y del día | Pendiente |
+| 6. Estado del sistema y del día | En curso: sistema hecho; clima, no molestar y lo del día pendientes |
 | 7. Pulido y publicación | Pendiente |
 
 ## Diseño acordado
 
-- **Cuerpo**: pantalla de cristal oscuro (cuadrado redondeado), translúcida.
+- **Cuerpo**: pantalla oscura (cuadrado redondeado), sólida por defecto; en Configuración se puede
+  bajar su opacidad (hasta el 50 %) para que sea de cristal.
 - **Cara LED**: dos ojos y una boca con trazos gruesos y brillo suave. Color por defecto blanco,
   con opción azul, naranja y lima. Sin carcasa, sin parecido a personajes ni logos conocidos.
   Los extras que salen de la cara (notas, manos, estrellas, nubecitas) llevan un borde oscuro fino
@@ -64,8 +79,8 @@ afinarlas con canciones reales.
   encajan y sin repetir los tres últimos. En una pausa espera; al volver la música, celebra.
   Canta con el volumen; notas al ritmo; globo con la canción al cambiar de pista. Sin volumen,
   no baila.
-- **Iconos de estado** sobre la cabeza: progreso del Pomodoro en el borde (hecho); sin internet y
-  batería baja (fase 6).
+- **Estado sobre la cabeza**: progreso del Pomodoro en el borde; sin internet, una antena (busca
+  señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño.
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
 
 ## Arquitectura (como está hoy)
@@ -91,7 +106,8 @@ afinarlas con canciones reales.
 | `src/companero/baile.ts` | Pasos de baile, elección por intensidad y tempo, mezcla entre pasos |
 | `src/companero/entorno.ts` | Clasifica la ventana de debajo y recuerda sitios visitados |
 | `src/companero/respuestas.ts` | Gestos de sí, no y no sé al interactuar |
-| `src/estado/*` | Pomodoro, agua, pausas y música (solo los arranca el compañero) |
+| `src/companero/sistema.ts` | Reacciones al estado del PC: antena sin internet, batería, uso, volumen |
+| `src/estado/*` | Pomodoro, agua, pausas y música (solo los arranca el compañero); tipos del sistema |
 | `src/panel/`, `src/globo/`, `config.html` | Panel, globo y configuración |
 
 ### Rust
@@ -103,6 +119,7 @@ afinarlas con canciones reales.
 | `media.rs` | Música del sistema (SMTC), controles y saltar a una posición |
 | `audio.rs` | Escucha la app de música (o toda la salida) con WASAPI loopback, solo mientras suena |
 | `ritmo.rs` | Bandas, golpes, tempo, pulso, compás y partes de la canción (sin código de Windows; con pruebas) |
+| `sistema.rs` | Batería (con consumo), volumen (y cambiarlo), conexión y uso del PC; avisa al cambiar |
 | `debajo.rs` | Programa y título de la ventana que queda debajo al soltarlo |
 | `notifications.rs` | Notificaciones del sistema (UserNotificationListener) |
 | `fullscreen.rs` | Ocultarse con una app a pantalla completa |
@@ -129,7 +146,9 @@ Cada fase termina con algo que funciona y se puede probar.
 - Música con globo y controles; Pomodoro, agua y pausas con globos y gestos.
 
 **Fase 4. Panel** ✅
-- Panel hacia el lado con espacio: Inicio, Avisos (abrir, descartar, borrar todo), Música.
+- Panel hacia el lado con espacio: Inicio, Avisos (abrir, descartar, borrar todo), Música y
+  Sistema.
+- Se reorganizará: barra de iconos; Inicio como resumen; Pomodoro, Pausas y Tareas en sus pestañas.
 
 **Fase 5. Asistente**
 - Pestañas Recordatorios y Chat en el panel.
@@ -137,9 +156,16 @@ Cada fase termina con algo que funciona y se puede probar.
 - Recordatorios («en N min», «a las HH:MM», «mañana…») persistentes, que sobreviven a reinicios.
 - Órdenes: pomodoro, agua, tiempo, batería, pausas.
 
-**Fase 6. Estado del sistema y del día**
-- Batería y conexión con iconos y avisos.
+**Fase 6. Estado del sistema y del día** (en curso)
+- ✅ Pestaña Sistema: batería (nivel, carga, tiempo restante, consumo en vatios, ahorro), volumen
+  (control, silencio, dispositivo), conexión (wifi o cable, sin internet) y uso de procesador y
+  memoria. En un PC de sobremesa no sale la batería.
+- ✅ Reacciones: sin internet busca señal con una antena y se queda con ella caída (reintenta
+  cada minuto); al volver, la antena se ilumina y celebra. Batería al 20 % y al 10 %, al
+  enchufarlo y al cargarse del todo. PC a tope (procesador 90 % durante 20 s) o sin memoria: suda.
+  Volumen: icono un momento y sorpresa si lo subes mucho. Cambio de altavoces a cascos: lo dice.
 - Tiempo del día (Open-Meteo, sin clave) y saludo de buenos días y buenas noches.
+- No molestar.
 - Noche: sugerir descanso. Ritmo de trabajo: avisar tras mucho tiempo sin pausa. Rachas.
 
 **Fase 7. Pulido y publicación**
@@ -159,6 +185,8 @@ Cada fase termina con algo que funciona y se puede probar.
 - Rutinas nuevas (pelota, bailar solo, estirarse a los lados) y doble clic variado.
 - Gestos de sí, no y no sé al interactuar (borrar avisos, música, Pomodoro, pausas).
 - Menos fotogramas dormido o cansado; la cara solo se redibuja si cambia.
+- Siete pasos de baile más (catorce en total), elección ponderada y según el tempo; canta a ratos.
+- Opacidad del cuerpo en Configuración (sólido por defecto).
 
 ## Mejorar el reconocimiento de la música
 
