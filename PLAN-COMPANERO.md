@@ -21,12 +21,15 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 
 **Siguiente**, en este orden:
 1. ~~**Clima**~~ ✅ (Open-Meteo, ciudad en Configuración): saludo de buenos días con el tiempo del
-   día y paraguas si va a llover. Falta probarlo en Windows con la API real.
-2. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
-3. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
+   día y paraguas si va a llover. Probado en Windows con la API real: funciona.
+2. **Animaciones del tiempo**: hoy solo hay un paraguas pequeño sobre la cabeza y se queda corto.
+   El compañero tiene que *vivir* el tiempo con el cuerpo y la cara, no llevar un icono. Ver
+   «Animaciones del tiempo» en la fase 6.
+3. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
+4. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
    gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
-4. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
-5. **Modo inteligente con Jev** (opcional, cuando haya acceso): ver «Hacerlo más inteligente».
+5. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
+6. **Modo inteligente con Jev** (opcional, cuando haya acceso): ver «Hacerlo más inteligente».
 
 | Fase | Estado |
 |---|---|
@@ -36,7 +39,7 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 | 3. Globos, notificaciones y música | Hecha |
 | 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
 | 5. Asistente | Pendiente |
-| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; no molestar y lo del día pendientes |
+| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; animaciones del tiempo, no molestar y lo del día pendientes |
 | 7. Pulido y publicación | Pendiente |
 
 ## Diseño acordado
@@ -84,6 +87,15 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
   señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño; si llueve
   o va a llover, un paraguas azul (con gotas mientras llueve).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
+
+## Preparar un equipo para desarrollar
+
+- Node.js, Rust (`rustup`, edición 2024: 1.85 o más) y Visual Studio Build Tools con
+  «Desarrollo para el escritorio con C++». WebView2 ya viene con Windows 11.
+- `npm install` y `npm run tauri dev` (la primera compilación tarda ~1–2 min).
+- **Control inteligente de aplicaciones** (Windows 11) bloquea los programas que Rust genera al
+  compilar (`os error 4551`): hay que desactivarlo en Seguridad de Windows → Control de
+  aplicaciones y del explorador.
 
 ## Arquitectura (como está hoy)
 
@@ -175,6 +187,34 @@ Cada fase termina con algo que funciona y se puede probar.
   (≥ 60 %) o ya llueve, lo avisa una vez y lleva un paraguas sobre la cabeza. Al elegir ciudad,
   cuenta el tiempo de allí. El panel enseña la temperatura junto a la fecha.
   Se pide desde el frontend: Rust no tiene cliente HTTP y añadirlo sería una dependencia nueva.
+- **Animaciones del tiempo** (siguiente). El paraguas fijo encima se queda corto: cada tiempo
+  cambia el cuerpo, la cara y lo que pasa alrededor, con transiciones suaves (nada aparece de golpe)
+  y respetando el modo tranquilo (menos partículas y movimiento). Todo en SVG dentro del margen de
+  la ventana (24 px por lado), sin dependencias nuevas. Un módulo nuevo `src/companero/tiempo.ts`
+  dibuja las escenas; `clima.ts` sigue pidiendo el tiempo y avisando.
+  - **Lluvia / llovizna**: el paraguas se abre con rebote (se pasa un poco y vuelve) y lo sujeta
+    a un lado con el mango bajando hasta el cuerpo; las gotas caen en diagonal, chocan con la
+    tela y salpican, y las de los lados forman un charquito bajo los pies que se agranda. Más
+    gotas cuanto más llueve (llovizna, lluvia, fuerte). Cuando para, cierra el paraguas, lo sacude
+    (gotitas que salen volando) y sonríe.
+  - **Va a llover** (aún no llueve): mira al cielo de vez en cuando y una nube gris pasa por
+    encima; el paraguas sale cerrado y lo abre al empezar la lluvia.
+  - **Tormenta**: como la lluvia, más el cristal que destella con el relámpago, un rayo que cruza
+    detrás y un susto (sorpresa y tiritón) con cada trueno, cada 8–20 s.
+  - **Nieve**: copos que bajan meciéndose y se van posando hasta formar una capita blanca sobre
+    la cabeza; de vez en cuando se la sacude. Tirita un poco.
+  - **Sol con calor** (≥ 28 °C): gafas de sol LED sobre los ojos, gota de sudor que resbala y un
+    brillo que recorre el cristal; a ratos se abanica con una manita.
+  - **Frío** (≤ 5 °C): tirita en ráfagas cortas, vaho al respirar (nubecita que sale de la boca y
+    se deshace) y bufanda de rayas.
+  - **Niebla**: bandas de niebla que pasan despacio por delante y lo difuminan; entrecierra los
+    ojos como si no viera.
+  - **Nublado**: una nubecita que pasa por detrás, y a veces se para a hacerle sombra.
+  - **Despejado de noche**: alguna estrellita que titila a su alrededor.
+  - **Buenos días**: el saludo lleva la escena del tiempo de hoy durante unos segundos (sale el sol
+    por detrás, o la nube con lluvia), aunque ahora mismo haga otro tiempo.
+  - Las escenas se apagan mientras duerme (solo la capa de nieve y el charquito se quedan), y los
+    iconos de batería y volumen tienen prioridad sobre lo que lleva encima.
 - Saludo de buenas noches.
 - No molestar.
 - Noche: sugerir descanso. Ritmo de trabajo: avisar tras mucho tiempo sin pausa. Rachas.
