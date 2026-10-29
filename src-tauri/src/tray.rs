@@ -70,8 +70,12 @@ pub fn crear(app: &AppHandle) -> tauri::Result<()> {
 }
 
 fn alternar_visible(app: &AppHandle) {
-    app.state::<Estado>().visible_usuario.fetch_xor(true, Ordering::SeqCst);
+    let antes = app.state::<Estado>().visible_usuario.fetch_xor(true, Ordering::SeqCst);
     aplicar_visibilidad(app);
+    // Vuelve (por ejemplo, tras decir «Adiós»): saluda
+    if !antes {
+        let _ = app.emit("companero-vuelve", ());
+    }
 }
 
 /// Abre la configuración desde la página. Es async porque crear una ventana desde un

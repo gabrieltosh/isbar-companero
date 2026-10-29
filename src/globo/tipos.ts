@@ -21,6 +21,8 @@ export interface ContenidoGlobo {
   acciones?: AccionGlobo[];
   /** Cuánto se queda a la vista (ms). 0 = hasta que se pulse un botón o se cierre */
   duracion: number;
+  /** Menú (clic derecho): sin texto, cada botón es un pensamiento suelto */
+  menu?: boolean;
 }
 
 /** El compañero pide mostrar un globo (ContenidoGlobo). */

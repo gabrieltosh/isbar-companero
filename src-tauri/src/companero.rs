@@ -271,11 +271,53 @@ pub fn salir_del_borde(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Se esconde a medias en el lado de la pantalla más cercano (opción «Esconderme» del menú).
+#[tauri::command]
+pub fn esconder_companero(app: AppHandle) -> Result<(), String> {
+    let ventana = ventana(&app)?;
+    crate::panel::cerrar_panel(app.clone());
+    thread::spawn(move || {
+        let Ok(pos) = ventana.outer_position() else {
+            return;
+        };
+        let Some(monitor) = monitor_de(&ventana, pos.x, pos.y) else {
+            return;
+        };
+        let dpi = monitor.scale_factor();
+        let px = |v: f64| (v * dpi).round() as i32;
+        let (lado_ventana, _, margen) = medidas();
+        let area = monitor.work_area();
+        let izq = area.position.x;
+        let der = izq + area.size.width as i32;
+        let centro = pos.x + px(lado_ventana) / 2;
+        // Basta con dejar el compañero pegado a ese lado: destino() lo esconde a medias
+        let x = if centro - izq < der - centro {
+            izq - px(margen)
+        } else {
+            der - px(lado_ventana) + px(margen)
+        };
+        soltar_en(&ventana, x, pos.y, true);
+    });
+    Ok(())
+}
+
+/// «Adiós»: se oculta hasta que se vuelva a mostrar desde la bandeja.
+#[tauri::command]
+pub fn despedirse(app: AppHandle) {
+    app.state::<Estado>().visible_usuario.store(false, Ordering::SeqCst);
+    aplicar_visibilidad(&app);
+}
+
 fn soltar(ventana: &WebviewWindow, permitir_borde: bool) {
     let Ok(pos) = ventana.outer_position() else {
         return;
     };
-    let (x, y, borde) = destino(ventana, pos.x, pos.y, permitir_borde);
+    soltar_en(ventana, pos.x, pos.y, permitir_borde);
+}
+
+/// Lleva la ventana a (x, y) (o a donde le toque, ver destino) y avisa de dónde quedó.
+fn soltar_en(ventana: &WebviewWindow, x: i32, y: i32, permitir_borde: bool) {
+    let (x, y, borde) = destino(ventana, x, y, permitir_borde);
     deslizar(ventana, (x, y));
     // Lo que queda debajo del centro del compañero
     let lado = ventana.outer_size().map(|t| t.width as i32).unwrap_or(0);

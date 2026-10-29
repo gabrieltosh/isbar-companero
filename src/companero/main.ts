@@ -20,6 +20,7 @@ import {
 import { beber } from "../estado/agua";
 import { alternarPomodoro } from "../estado/pomodoro";
 import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
+import { avisar, cerrar as cerrarGlobo, globoActual } from "./globos";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
@@ -580,6 +581,54 @@ window.addEventListener("pointerup", () => {
     }, DOBLE_CLIC_MS);
   }
 });
+
+// ---------- Menú (clic derecho) ----------
+
+/** Lo que tarda en irse tras despedirse con la mano. */
+const ADIOS_MS = 1100;
+/** Lo que se queda el menú a la vista si no se elige nada. */
+const MENU_MS = 6000;
+let menuAbierto: number | null = null;
+
+/** Menú de pensamientos: esconderse en un lado de la pantalla (o salir de él) y «Adiós». */
+function abrirMenu(): void {
+  const otro = globoActual();
+  if (otro !== null) cerrarGlobo(otro);
+  if (menuAbierto !== null) cerrarGlobo(menuAbierto);
+  invoke("cerrar_panel").catch(console.error);
+  gesto("pensativo", 1200);
+  menuAbierto = avisar({
+    titulo: "",
+    menu: true,
+    urgente: true,
+    duracion: MENU_MS,
+    acciones: [
+      borde !== 0 ? { id: "salir", texto: "Salir de aquí" } : { id: "esconder", texto: "Esconderme" },
+      { id: "adios", texto: "Adiós por ahora" },
+    ],
+    alAccion: (accion) => {
+      menuAbierto = null;
+      if (accion === "esconder") {
+        gesto("guino", DURACION_GUINO);
+        invoke("esconder_companero").catch(console.error);
+      } else if (accion === "salir") {
+        invoke("salir_del_borde").catch(console.error);
+      } else if (accion === "adios") {
+        // Se despide con la mano y se va; vuelve desde el icono de la bandeja
+        gesto("saludo", ADIOS_MS + 300);
+        window.setTimeout(() => invoke("despedirse").catch(console.error), ADIOS_MS);
+      }
+    },
+  });
+}
+
+companero.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (!arrastrando) abrirMenu();
+});
+
+// Vuelve tras «Adiós» (desde la bandeja): saluda
+listen("companero-vuelve", () => gesto("saludo", 2200)).catch(console.error);
 
 // Tras moverlo a otro sitio, curiosea lo que hay alrededor y reacciona (cada vez distinto)
 /** Formas de examinar el nuevo sitio: cara, cuánto dura, hacia dónde mira por tramos y cuánto ladea la cabeza. */

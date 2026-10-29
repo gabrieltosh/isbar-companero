@@ -42,6 +42,7 @@ function contenido(a: Aviso & { id: number }): ContenidoGlobo {
     imagen: a.imagen,
     acciones: a.acciones,
     duracion: a.duracion,
+    menu: a.menu,
   };
 }
 

@@ -86,6 +86,10 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
   señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño (tiene
   prioridad sobre el paraguas). El tiempo se vive con escenas alrededor (ver fase 6).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
+- **Menú con clic derecho**: opciones como pensamientos sueltos que salen del compañero.
+  «Esconderme» lo lleva al lado más cercano de la pantalla, asomando media cara (si ya está
+  escondido, «Salir de aquí»); «Adiós por ahora» se despide con la mano y se oculta hasta que se
+  vuelve a mostrar desde el icono de la bandeja (y entonces saluda). Los globos tienen una ✕.
 
 ## Preparar un equipo para desarrollar
 

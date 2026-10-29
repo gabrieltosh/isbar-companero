@@ -1,5 +1,5 @@
 // Ventana del globo de pensamiento: muestra lo que le pide el compañero, se coloca junto a él
-// (Rust decide el lado) y avisa cuando se pulsa un botón o se cierra.
+// (Rust decide el lado) y avisa cuando se pulsa un botón o se cierra (también con la ✕).
 // Al pasar el ratón por encima el tiempo se para, para que dé tiempo a leerlo.
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -36,6 +36,7 @@ let encima = false;
 let tamano = { ancho: 0, alto: 0 };
 
 function pintar(c: ContenidoGlobo): void {
+  globo.classList.toggle("menu", !!c.menu);
   $(globo, ".origen").textContent = c.origen ?? "";
   $(globo, ".titulo").textContent = c.titulo;
   $(globo, ".texto").textContent = c.texto ?? "";
@@ -108,6 +109,12 @@ globo.addEventListener("mouseenter", () => {
 globo.addEventListener("mouseleave", () => {
   encima = false;
   if (actual) programarCierre(Math.max(TIEMPO_TRAS_HOVER, finEn - Date.now()));
+});
+
+// La ✕ solo cierra: no cuenta como tocar el globo
+$(globo, ".cerrar").addEventListener("click", (e) => {
+  e.stopPropagation();
+  cerrar();
 });
 
 globo.addEventListener("click", (e) => {
