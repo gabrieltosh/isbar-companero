@@ -407,7 +407,8 @@ svg {
 }
 .aviso {
   display: grid;
-  grid-template-columns: 30px 1fr auto;
+  /* minmax(0, …): los textos largos se recortan con «…» en vez de salirse de la tarjeta */
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   gap: 9px;
   align-items: start;
   padding: 9px;
@@ -439,9 +440,16 @@ svg {
   height: 100%;
   object-fit: cover;
 }
+.aviso > div {
+  min-width: 0;
+}
 .aviso small {
+  display: block;
   color: var(--suave);
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .aviso b {
   display: block;
