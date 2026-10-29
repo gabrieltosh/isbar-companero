@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::window::{aplicar_visibilidad, Estado};
 
@@ -16,9 +16,23 @@ pub(crate) const ARGS_NAVEGADOR: &str =
 
 pub fn crear(app: &AppHandle) -> tauri::Result<()> {
     let alternar = MenuItem::with_id(app, "alternar", "Mostrar/ocultar", true, None::<&str>)?;
+    let pomodoro = MenuItem::with_id(app, "pomodoro", "Empezar o pausar el Pomodoro", true, None::<&str>)?;
+    let agua = MenuItem::with_id(app, "agua", "Bebí agua", true, None::<&str>)?;
     let config = MenuItem::with_id(app, "config", "Configuración", true, None::<&str>)?;
     let salir = MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&alternar, &config, &PredefinedMenuItem::separator(app)?, &salir])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &alternar,
+            &PredefinedMenuItem::separator(app)?,
+            &pomodoro,
+            &agua,
+            &PredefinedMenuItem::separator(app)?,
+            &config,
+            &PredefinedMenuItem::separator(app)?,
+            &salir,
+        ],
+    )?;
 
     let mut icono = TrayIconBuilder::with_id("isla")
         .tooltip("isbar")
@@ -28,6 +42,13 @@ pub fn crear(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, evento| match evento.id().as_ref() {
             "alternar" => alternar_visible(app),
             "config" => abrir_configuracion(app),
+            // Atajos que hace el compañero (su página tiene el estado)
+            "pomodoro" => {
+                let _ = app.emit("menu-pomodoro", ());
+            }
+            "agua" => {
+                let _ = app.emit("menu-agua", ());
+            }
             "salir" => app.exit(0),
             _ => {}
         })

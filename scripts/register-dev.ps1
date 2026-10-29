@@ -1,4 +1,4 @@
-﻿# Registra el sparse package de Isla para desarrollo.
+﻿# Registra el sparse package del Compañero para desarrollo.
 #
 # Windows 10 no da identidad a un sparse package registrado sin firmar, así que el script:
 #   1. Crea (una sola vez) un certificado de prueba CN=IslaDev en el almacén del usuario.
@@ -17,7 +17,7 @@ $raiz = Split-Path -Parent $PSScriptRoot
 $carpetaPaquete = Join-Path $raiz 'src-tauri\paquete'
 $carpetaExe = Join-Path $raiz "src-tauri\target\$Perfil"
 $carpetaSalida = Join-Path $raiz 'src-tauri\target\paquete'
-$msix = Join-Path $carpetaSalida 'isla-dev.msix'
+$msix = Join-Path $carpetaSalida 'companero-dev.msix'
 $sujeto = 'CN=IslaDev' # Debe coincidir con Publisher del AppxManifest.xml
 
 if (-not (Test-Path (Join-Path $carpetaExe 'isla.exe'))) {
@@ -75,7 +75,7 @@ if ($LASTEXITCODE -ne 0) { throw 'signtool no pudo firmar el paquete.' }
 # si Assets no está junto a isla.exe, el exe arranca sin identidad.
 Copy-Item -Recurse -Force (Join-Path $carpetaPaquete 'Assets') $carpetaExe
 
-$previo = Get-AppxPackage -Name 'IslaApp'
+$previo = Get-AppxPackage -Name 'IsbarCompaneroDev'
 if ($previo) {
     Write-Host "Quitando el registro anterior: $($previo.PackageFullName)"
     Remove-AppxPackage -Package $previo.PackageFullName
@@ -83,5 +83,5 @@ if ($previo) {
 Write-Host "Instalando el paquete con el ejecutable de $carpetaExe"
 Add-AppxPackage -Path $msix -ExternalLocation $carpetaExe
 
-Get-AppxPackage -Name 'IslaApp' | Format-List Name, PackageFullName, InstallLocation
+Get-AppxPackage -Name 'IsbarCompaneroDev' | Format-List Name, PackageFullName, InstallLocation
 Write-Host 'Listo. Cierra y vuelve a abrir la isla para que arranque con identidad de paquete.'

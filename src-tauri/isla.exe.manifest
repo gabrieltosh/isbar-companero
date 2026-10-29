@@ -5,8 +5,8 @@
   <!-- Identidad del sparse package: debe coincidir con paquete/AppxManifest.xml -->
   <msix xmlns="urn:schemas-microsoft-com:msix.v1"
         publisher="CN=IslaDev"
-        packageName="IslaApp"
-        applicationId="Isla" />
+        packageName="IsbarCompaneroDev"
+        applicationId="Companero" />
   <!-- Controles comunes v6 (el manifiesto por defecto de Tauri tambien lo incluye) -->
   <dependency>
     <dependentAssembly>

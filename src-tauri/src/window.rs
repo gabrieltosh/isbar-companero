@@ -36,6 +36,8 @@ pub struct Estado {
     pub pantalla_completa: AtomicBool,
     /// La ventana ya está colocada y se puede mostrar
     pub listo: AtomicBool,
+    /// Hay un globo de pensamiento a la vista
+    pub globo: AtomicBool,
     /// Zonas que reciben el ratón
     pub rects: Mutex<Vec<Rect>>,
 }
@@ -46,12 +48,13 @@ impl Default for Estado {
             visible_usuario: AtomicBool::new(true),
             pantalla_completa: AtomicBool::new(false),
             listo: AtomicBool::new(false),
+            globo: AtomicBool::new(false),
             rects: Mutex::new(Vec::new()),
         }
     }
 }
 
-/// Muestra u oculta el compañero según la bandeja y la pantalla completa.
+/// Muestra u oculta el compañero (y su globo) según la bandeja y la pantalla completa.
 pub fn aplicar_visibilidad(app: &AppHandle) {
     let estado = app.state::<Estado>();
     let visible = estado.visible_usuario.load(Ordering::SeqCst)
@@ -59,6 +62,9 @@ pub fn aplicar_visibilidad(app: &AppHandle) {
         && estado.listo.load(Ordering::SeqCst);
     if let Some(ventana) = app.get_webview_window(ETIQUETA) {
         fijar_visible(&ventana, visible);
+    }
+    if let Some(globo) = app.get_webview_window(crate::globo::ETIQUETA) {
+        fijar_visible(&globo, visible && estado.globo.load(Ordering::SeqCst));
     }
 }
 

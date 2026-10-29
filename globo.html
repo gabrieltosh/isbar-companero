@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/src/globo/globo.css" />
+    <title>isbar</title>
+    <script type="module" src="/src/globo/main.ts"></script>
+  </head>
+
+  <body>
+    <!-- Globo de pensamiento: la ventana tiene justo su tamaño (más las nubecitas) -->
+    <div id="globo" class="globo" role="status" aria-live="polite">
+      <span class="nube n1"></span>
+      <span class="nube n2"></span>
+      <div class="caja">
+        <div class="arriba">
+          <img class="imagen" alt="" hidden />
+          <div class="textos">
+            <small class="origen"></small>
+            <b class="titulo"></b>
+            <p class="texto"></p>
+          </div>
+        </div>
+        <div class="acciones"></div>
+      </div>
+    </div>
+  </body>
+</html>

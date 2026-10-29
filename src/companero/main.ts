@@ -15,6 +15,9 @@ import {
   type Pose,
   type Rasgos,
 } from "./cara";
+import { beber } from "../estado/agua";
+import { alternarPomodoro } from "../estado/pomodoro";
+import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -122,7 +125,7 @@ function fotograma(ahora: number): void {
     sesion: ahora - sesionDesde,
     noche,
     tranquilo: config.tranquilo,
-    peticion: null,
+    peticion: peticionApp(),
   });
   if (expresion !== expresionActual) {
     // Empieza desde lo que se ve ahora (aunque estuviera a mitad de otro cambio)
@@ -259,8 +262,20 @@ function fotograma(ahora: number): void {
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
-  cara.innerHTML = dibujarConMorph(ahora);
+  cara.innerHTML = anilloPomodoro() + dibujarConMorph(ahora);
   requestAnimationFrame(fotograma);
+}
+
+/** Con un Pomodoro en marcha, su progreso recorre el borde del compañero (rojo enfoque, verde descanso). */
+function anilloPomodoro(): string {
+  const p = progresoPomodoro();
+  if (!p) return "";
+  const color = p.enfoque ? "#FF453A" : "#30D158";
+  const borde = `x="-3" y="-3" width="70" height="70" rx="21" fill="none" stroke-width="2.5"`;
+  return (
+    `<rect ${borde} stroke="${color}" stroke-opacity=".2"/>` +
+    `<rect ${borde} stroke="${color}" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${(100 * (1 - p.progreso)).toFixed(2)}"/>`
+  );
 }
 
 /** Curva de aceleración suave al empezar y al terminar. */
@@ -466,6 +481,16 @@ async function aplicarAjustes(): Promise<void> {
 
 listen(EVENTO_AJUSTES, () => void aplicarAjustes()).catch(console.error);
 
+// Atajos del menú de la bandeja (hasta que el compañero tenga su panel)
+listen("menu-pomodoro", () => {
+  alternarPomodoro();
+  gesto("guino", DURACION_GUINO);
+}).catch(console.error);
+listen("menu-agua", () => {
+  beber();
+  gesto("feliz", 1400);
+}).catch(console.error);
+
 // ---------- Arranque ----------
 
 // La posición se lee antes de fijar el tamaño (que recoloca la ventana)
@@ -477,7 +502,8 @@ borde = await invoke<number>("iniciar_companero", { pos: guardada }).catch((e) =
 });
 colocado = true;
 cursor = { x: centro(), y: centro() };
-// Saluda al aparecer
+// Saluda al aparecer y empieza a escuchar notificaciones, música, Pomodoro, agua y pausas
 gesto("saludo", 2600);
+iniciarAvisos();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);

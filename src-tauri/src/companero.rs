@@ -32,7 +32,7 @@ const AVISO_INACTIVIDAD: Duration = Duration::from_secs(2);
 static INACTIVIDAD_INICIADA: AtomicBool = AtomicBool::new(false);
 
 /// Lado de la ventana, lado del compañero y margen entre ambos, con el tamaño elegido.
-fn medidas() -> (f64, f64, f64) {
+pub(crate) fn medidas() -> (f64, f64, f64) {
     let e = ESCALA.lock().map(|e| *e).unwrap_or(1.0);
     let (ventana, lado) = (LADO_VENTANA * e, LADO * e);
     (ventana, lado, (ventana - lado) / 2.0)
@@ -104,7 +104,7 @@ fn ventana(app: &AppHandle) -> Result<WebviewWindow, String> {
 }
 
 /// Monitor en el que está el centro del compañero (o el principal, o el primero).
-fn monitor_de(ventana: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {
+pub(crate) fn monitor_de(ventana: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {
     let monitores = ventana.available_monitors().ok()?;
     let dentro = monitores.iter().find(|m| {
         let lado = (medidas().0 * m.scale_factor()) as i32;
@@ -202,6 +202,9 @@ pub fn set_companero_rects(estado: tauri::State<'_, Estado>, rects: Vec<Rect>) {
 pub fn arrastrar_companero(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
     let ventana = ventana(&app)?;
     let escala = ventana.scale_factor().map_err(|e| e.to_string())?;
+    // El globo se aparta mientras se mueve
+    crate::globo::ocultar_globo(app.clone());
+    let _ = ventana.emit("globo-cerrar", ());
     thread::spawn(move || {
         let mut vuelta = 0u32;
         while boton_pulsado() {

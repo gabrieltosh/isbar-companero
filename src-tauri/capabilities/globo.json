@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "globo",
+  "description": "Permisos de la ventana de los globos de pensamiento",
+  "windows": ["globo"],
+  "permissions": ["core:default"]
+}

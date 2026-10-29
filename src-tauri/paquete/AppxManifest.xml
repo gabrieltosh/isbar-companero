@@ -3,8 +3,7 @@
   Sparse package: da identidad de paquete a isla.exe sin empaquetarlo.
   Hace falta para UserNotificationListener (leer las notificaciones del sistema).
   Name y Publisher deben coincidir con el manifiesto embebido (isla.exe.manifest).
-  El nombre es "IslaApp" y no "Isla": la familia Isla_* quedó con estado residual de
-  un registro sin firmar y Windows ya no le da identidad al ejecutable.
+  Nombre propio del Compañero (IsbarCompaneroDev) para no pisar el de la isla (IslaApp).
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -14,10 +13,10 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap3 uap10 rescap">
 
-  <Identity Name="IslaApp" Publisher="CN=IslaDev" Version="0.1.0.0" ProcessorArchitecture="neutral" />
+  <Identity Name="IsbarCompaneroDev" Publisher="CN=IslaDev" Version="0.1.0.0" ProcessorArchitecture="neutral" />
 
   <Properties>
-    <DisplayName>Isla</DisplayName>
+    <DisplayName>isbar Compañero (desarrollo)</DisplayName>
     <PublisherDisplayName>Gabriel Pinto</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
@@ -40,10 +39,10 @@
 
   <Applications>
     <!-- El ejecutable se busca en la carpeta externa (-ExternalLocation) -->
-    <Application Id="Isla" Executable="isla.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+    <Application Id="Companero" Executable="isla.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
       <uap:VisualElements
-        DisplayName="Isla"
-        Description="Dynamic Island para Windows"
+        DisplayName="isbar Compañero"
+        Description="Asistente con cara que vive en tu pantalla"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
