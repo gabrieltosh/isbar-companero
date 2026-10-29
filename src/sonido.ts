@@ -6,6 +6,12 @@ import { leer } from "./store";
 
 let contexto: AudioContext | null = null;
 let config: ConfigSonido = SONIDO_POR_DEFECTO;
+/** Con «No molestar» no suenan los avisos (el "tic" de una rutina que ya empezaste, sí). */
+let silencio = false;
+
+export function silenciarAvisos(silenciar: boolean): void {
+  silencio = silenciar;
+}
 
 function audio(): AudioContext | null {
   try {
@@ -51,7 +57,7 @@ export function tic(volumen: number): void {
 
 /** Campanita de aviso (pausa que toca, fin de rutina, recordatorio de agua). */
 export function sonarAviso(): void {
-  if (config.activo) campanita(config.volumen);
+  if (config.activo && !silencio) campanita(config.volumen);
 }
 
 /** "Tic" al empezar cada paso de una rutina. */

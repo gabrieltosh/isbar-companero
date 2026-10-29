@@ -24,7 +24,8 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
    día y paraguas si va a llover. Probado en Windows con la API real: funciona.
 2. ~~**Animaciones del tiempo**~~ ✅ (`tiempo.ts`): cada tiempo tiene su escena (ver fase 6).
    Probadas en una página de prueba; falta verlas en Windows con el tiempo real.
-3. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
+3. ~~**No molestar**~~ ✅ (`noMolestar.ts`, desde el menú del clic derecho): 30 min, 1 h o hasta
+   mañana (7:00). Sin globos ni campanitas; los que esperan respuesta salen al terminar.
 4. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
    gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
 5. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
@@ -38,7 +39,7 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 | 3. Globos, notificaciones y música | Hecha |
 | 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
 | 5. Asistente | Pendiente |
-| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; sistema, tiempo y sus animaciones hechos; no molestar y lo del día pendientes |
+| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; sistema, tiempo y sus animaciones y no molestar hechos; lo del día pendiente |
 | 7. Pulido y publicación | Pendiente |
 
 ## Diseño acordado
@@ -89,7 +90,9 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
 - **Menú con clic derecho**: opciones como pensamientos sueltos que salen del compañero.
   «Esconderme» lo lleva al lado más cercano de la pantalla, asomando media cara (si ya está
   escondido, «Salir de aquí»); «Adiós por ahora» se despide con la mano y se oculta hasta que se
-  vuelve a mostrar desde el icono de la bandeja (y entonces saluda). Los globos tienen una ✕.
+  vuelve a mostrar desde el icono de la bandeja (y entonces saluda). «No molestar» abre un segundo
+  pensamiento con la duración (30 min, 1 h, hasta mañana); mientras dura lleva un círculo con raya
+  arriba a la izquierda y el menú ofrece «Ya puedes molestarme». Los globos tienen una ✕.
 
 ## Preparar un equipo para desarrollar
 
@@ -224,7 +227,7 @@ Cada fase termina con algo que funciona y se puede probar.
   - Las escenas se apagan mientras duerme (solo se queda la capa de nieve), y los
     iconos de batería y volumen tienen prioridad sobre lo que lleva encima.
 - Saludo de buenas noches.
-- No molestar.
+- ~~No molestar~~ ✅.
 - Noche: sugerir descanso. Ritmo de trabajo: avisar tras mucho tiempo sin pausa. Rachas.
 
 **Fase 7. Pulido y publicación**

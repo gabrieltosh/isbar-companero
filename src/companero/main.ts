@@ -21,6 +21,7 @@ import { beber } from "../estado/agua";
 import { alternarPomodoro } from "../estado/pomodoro";
 import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { avisar, cerrar as cerrarGlobo, globoActual } from "./globos";
+import { activarNoMolestar, iniciarNoMolestar, minutosNoMolestar, noMolestar, quitarNoMolestar, type DuracionNoMolestar } from "./noMolestar";
 import { iniciarPuente } from "./puente";
 import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
 import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
@@ -438,7 +439,8 @@ function fotograma(ahora: number): void {
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
   // Solo se reescribe la cara si ha cambiado algo
-  const dibujo = anilloPomodoro() + dibujarConMorph(ahora, tiempo.entorna) + tiempo.cuerpo + iconoSistema(ahora);
+  const dibujo =
+    anilloPomodoro() + dibujarConMorph(ahora, tiempo.entorna) + tiempo.cuerpo + iconoSistema(ahora) + iconoNoMolestar();
   if (dibujo !== dibujoCara) {
     cara.innerHTML = dibujo;
     dibujoCara = dibujo;
@@ -452,6 +454,16 @@ function fotograma(ahora: number): void {
     dibujoFrente = tiempo.frente;
   }
   requestAnimationFrame(fotograma);
+}
+
+/** Con «No molestar», el símbolo de prohibido pasar (círculo con raya) arriba a la izquierda. */
+function iconoNoMolestar(): string {
+  if (!noMolestar()) return "";
+  const c = config.color;
+  return (
+    `<circle cx="8" cy="-5" r="4.6" fill="#0B0B0C" stroke="${c}" stroke-width="1.3"/>` +
+    `<path d="M5.6 -5h4.8" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>`
+  );
 }
 
 /** Con un Pomodoro en marcha, su progreso recorre el borde del compañero (rojo enfoque, verde descanso). */
@@ -590,24 +602,43 @@ const ADIOS_MS = 1100;
 const MENU_MS = 6000;
 let menuAbierto: number | null = null;
 
-/** Menú de pensamientos: esconderse en un lado de la pantalla (o salir de él) y «Adiós». */
-function abrirMenu(): void {
+/** Muestra un menú de pensamientos (cerrando el globo o menú que hubiera). */
+function pensarOpciones(acciones: { id: string; texto: string }[], alElegir: (accion: string) => void): void {
   const otro = globoActual();
   if (otro !== null) cerrarGlobo(otro);
   if (menuAbierto !== null) cerrarGlobo(menuAbierto);
-  invoke("cerrar_panel").catch(console.error);
-  gesto("pensativo", 1200);
   menuAbierto = avisar({
     titulo: "",
     menu: true,
     urgente: true,
     duracion: MENU_MS,
-    acciones: [
-      borde !== 0 ? { id: "salir", texto: "Salir de aquí" } : { id: "esconder", texto: "Esconderme" },
-      { id: "adios", texto: "Adiós por ahora" },
-    ],
+    acciones,
     alAccion: (accion) => {
       menuAbierto = null;
+      alElegir(accion);
+    },
+  });
+}
+
+/** «No molestar» que queda, para el menú: "25 min", "2 h"… */
+function quedaNoMolestar(): string {
+  const m = minutosNoMolestar();
+  return m < 60 ? `${m} min` : `${Math.round(m / 60)} h`;
+}
+
+/** Menú de pensamientos: esconderse en un lado de la pantalla (o salir de él), «No molestar» y «Adiós». */
+function abrirMenu(): void {
+  invoke("cerrar_panel").catch(console.error);
+  gesto("pensativo", 1200);
+  pensarOpciones(
+    [
+      borde !== 0 ? { id: "salir", texto: "Salir de aquí" } : { id: "esconder", texto: "Esconderme" },
+      noMolestar()
+        ? { id: "molestar", texto: `Ya puedes molestarme (quedan ${quedaNoMolestar()})` }
+        : { id: "silencio", texto: "No molestar" },
+      { id: "adios", texto: "Adiós por ahora" },
+    ],
+    (accion) => {
       if (accion === "esconder") {
         gesto("guino", DURACION_GUINO);
         invoke("esconder_companero").catch(console.error);
@@ -617,9 +648,25 @@ function abrirMenu(): void {
         // Se despide con la mano y se va; vuelve desde el icono de la bandeja
         gesto("saludo", ADIOS_MS + 300);
         window.setTimeout(() => invoke("despedirse").catch(console.error), ADIOS_MS);
+      } else if (accion === "molestar") {
+        quitarNoMolestar();
+      } else if (accion === "silencio") {
+        // Segundo pensamiento: cuánto rato
+        pensarOpciones(
+          [
+            { id: "30", texto: "30 minutos" },
+            { id: "60", texto: "1 hora" },
+            { id: "manana", texto: "Hasta mañana" },
+          ],
+          (duracion) => {
+            if (duracion !== "30" && duracion !== "60" && duracion !== "manana") return;
+            activarNoMolestar(duracion as DuracionNoMolestar);
+            gesto("guino", DURACION_GUINO);
+          },
+        );
       }
     },
-  });
+  );
 }
 
 companero.addEventListener("contextmenu", (e) => {
@@ -828,6 +875,7 @@ borde = await invoke<number>("iniciar_companero", { pos: guardada }).catch((e) =
   return 0;
 });
 colocado = true;
+await iniciarNoMolestar();
 cursor = { x: centro(), y: centro() };
 // Saluda al aparecer y empieza a escuchar notificaciones, música, Pomodoro, agua y pausas
 gesto("saludo", 2600);

@@ -1,5 +1,7 @@
 // Cola de globos de pensamiento del compañero: se muestran de uno en uno en la ventana del globo.
 // Cada globo puede tener botones; al pulsarlos se llama a su función.
+// Con «No molestar» solo salen los menús: los que esperan respuesta (urgentes o sin tiempo
+// límite) aguardan en la cola y los demás se descartan.
 import { emit, listen } from "@tauri-apps/api/event";
 import {
   EVENTO_ACCION,
@@ -32,6 +34,11 @@ let actual: (Aviso & { id: number }) | null = null;
 let tSiguiente = 0;
 /** Con el panel abierto los globos esperan en la cola. */
 let pausados = false;
+/** «No molestar» activo. */
+let silencio = false;
+
+/** Los que esperan respuesta no se pierden con «No molestar»: aguardan a que termine. */
+const esperaRespuesta = (a: Aviso) => a.urgente === true || a.duracion === 0;
 
 function contenido(a: Aviso & { id: number }): ContenidoGlobo {
   return {
@@ -48,7 +55,9 @@ function contenido(a: Aviso & { id: number }): ContenidoGlobo {
 
 function mostrarSiguiente(): void {
   if (pausados || actual || cola.length === 0) return;
-  actual = cola.shift() ?? null;
+  const i = silencio ? cola.findIndex((a) => a.menu) : 0;
+  if (i < 0) return;
+  actual = cola.splice(i, 1)[0] ?? null;
   if (!actual) return;
   if (actual.gesto) gesto(actual.gesto, DURACION_GESTO);
   void emit(EVENTO_MOSTRAR, contenido(actual));
@@ -57,6 +66,7 @@ function mostrarSiguiente(): void {
 /** Pide un globo. Devuelve su id (para actualizarlo o cerrarlo). */
 export function avisar(aviso: Aviso): number {
   const nuevo = { ...aviso, id: siguienteId++ };
+  if (silencio && !aviso.menu && !esperaRespuesta(aviso)) return nuevo.id;
   if (aviso.urgente) cola.unshift(nuevo);
   else cola.push(nuevo);
   mostrarSiguiente();
@@ -89,6 +99,12 @@ export function pausarGlobos(pausar: boolean): void {
     actual = null;
   }
   if (!pausar) mostrarSiguiente();
+}
+
+/** Activa o quita «No molestar»; al quitarlo salen los que esperaban. */
+export function silenciarGlobos(silenciar: boolean): void {
+  silencio = silenciar;
+  if (!silenciar) mostrarSiguiente();
 }
 
 export function globoActual(): number | null {
