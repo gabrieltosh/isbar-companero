@@ -69,3 +69,13 @@ export interface ConfigSonido {
 }
 
 export const SONIDO_POR_DEFECTO: ConfigSonido = { activo: true, volumen: 0.6 };
+
+/** Ciudad para el tiempo (Open-Meteo). Sin ciudad, el compañero no mira el tiempo. */
+export interface ConfigClima {
+  /** Nombre que se enseña ("Santiago, Chile") */
+  ciudad: string;
+  latitud: number | null;
+  longitud: number | null;
+}
+
+export const CLIMA_POR_DEFECTO: ConfigClima = { ciudad: "", latitud: null, longitud: null };

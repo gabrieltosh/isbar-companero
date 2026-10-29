@@ -61,6 +61,15 @@ function pintarCabecera(): void {
   $(document, "#fecha").textContent = new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
 }
 
+/** El tiempo de ahora junto a la fecha: "· 18 °C, nublado" (la ciudad, al pasar el ratón). */
+function pintarClima(e: EstadoPanel): void {
+  const el = $(document, "#clima");
+  el.hidden = !e.clima;
+  if (!e.clima) return;
+  el.textContent = ` · ${Math.round(e.clima.temperatura)} °C, ${e.clima.texto.toLowerCase()}`;
+  el.title = e.clima.ciudad;
+}
+
 function irA(vista: string): void {
   document.querySelectorAll<HTMLElement>("[data-vista]").forEach((e) => e.classList.toggle("activa", e.dataset.vista === vista));
   if (vista === "avisos") void cargarAvisos();
@@ -357,6 +366,7 @@ listen<EstadoPanel>(EVENTO_ESTADO, ({ payload }) => {
   estado = payload;
   pintarInicio(payload);
   pintarMusica(payload);
+  pintarClima(payload);
 }).catch(console.error);
 
 listen<boolean>(EVENTO_VISIBLE, ({ payload }) => {

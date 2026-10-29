@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import {
   AGUA_POR_DEFECTO,
+  CLIMA_POR_DEFECTO,
   COLORES_COMPANERO,
   COMPANERO_POR_DEFECTO,
   EVENTO_AJUSTES,
@@ -11,11 +12,13 @@ import {
   SONIDO_POR_DEFECTO,
   TAMANOS_COMPANERO,
   type ConfigAgua,
+  type ConfigClima,
   type ConfigCompanero,
   type ConfigPausas,
   type ConfigPomodoro,
   type ConfigSonido,
 } from "./ajustes";
+import { buscarCiudad, type Lugar } from "./estado/clima";
 import { campanita } from "./sonido";
 import { guardar, leer } from "./store";
 import { $, escapar } from "./util";
@@ -27,12 +30,14 @@ const grupos: {
   pausas: ConfigPausas;
   sonido: ConfigSonido;
   companero: ConfigCompanero;
+  clima: ConfigClima;
 } = {
   pomodoro: await leer("pomodoroConfig", POMODORO_POR_DEFECTO),
   agua: await leer("aguaConfig", AGUA_POR_DEFECTO),
   pausas: { ...PAUSAS_POR_DEFECTO, ...(await leer<Partial<ConfigPausas>>("pausasConfig", {})) },
   sonido: { ...SONIDO_POR_DEFECTO, ...(await leer<Partial<ConfigSonido>>("sonidoConfig", {})) },
   companero: { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) },
+  clima: { ...CLIMA_POR_DEFECTO, ...(await leer<Partial<ConfigClima>>("climaConfig", {})) },
 };
 const CLAVES: Record<keyof typeof grupos, string> = {
   pomodoro: "pomodoroConfig",
@@ -40,6 +45,7 @@ const CLAVES: Record<keyof typeof grupos, string> = {
   pausas: "pausasConfig",
   sonido: "sonidoConfig",
   companero: "companeroConfig",
+  clima: "climaConfig",
 };
 
 async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
@@ -106,6 +112,67 @@ selectorCompanero("#companero-color", COLORES_COMPANERO, grupos.companero.color,
 selectorCompanero("#companero-tamano", TAMANOS_COMPANERO, String(grupos.companero.tamano), (v) => {
   grupos.companero.tamano = Number(v);
 });
+
+// ---------- Tiempo ----------
+// Se busca la ciudad por su nombre y se guarda su posición; el compañero mira el tiempo allí
+
+const climaCiudad = $(document, "#clima-ciudad");
+const climaQuitar = $(document, "#clima-quitar");
+const climaBuscar = $<HTMLInputElement>(document, "#clima-buscar");
+const climaBoton = $<HTMLButtonElement>(document, "#clima-boton");
+const climaFila = $(document, "#clima-fila");
+const climaResultados = $<HTMLSelectElement>(document, "#clima-resultados");
+let encontrados: Lugar[] = [];
+
+function pintarCiudad(): void {
+  climaCiudad.textContent = grupos.clima.ciudad || "Ninguna";
+  climaQuitar.hidden = !grupos.clima.ciudad;
+}
+
+function elegirCiudad(l: Lugar | null): void {
+  grupos.clima = l ? { ciudad: l.nombre, latitud: l.latitud, longitud: l.longitud } : { ...CLIMA_POR_DEFECTO };
+  climaFila.hidden = true;
+  climaBuscar.value = "";
+  pintarCiudad();
+  void guardarGrupo("clima");
+}
+
+async function buscar(): Promise<void> {
+  const nombre = climaBuscar.value.trim();
+  if (nombre.length < 2) return;
+  climaBoton.disabled = true;
+  climaBoton.textContent = "Buscando…";
+  try {
+    encontrados = await buscarCiudad(nombre);
+    if (encontrados.length === 1) {
+      elegirCiudad(encontrados[0]);
+    } else {
+      climaResultados.innerHTML = encontrados.length
+        ? `<option value="" disabled selected>${encontrados.length} encontradas</option>` +
+          encontrados.map((l, i) => `<option value="${i}">${escapar(l.nombre)}</option>`).join("")
+        : `<option value="" disabled selected>No la encuentro</option>`;
+      climaFila.hidden = false;
+    }
+  } catch (e) {
+    console.error("clima:", e);
+    climaResultados.innerHTML = `<option value="" disabled selected>Sin conexión con Open-Meteo</option>`;
+    climaFila.hidden = false;
+  } finally {
+    climaBoton.disabled = false;
+    climaBoton.textContent = "Buscar";
+  }
+}
+
+climaBoton.addEventListener("click", () => void buscar());
+climaBuscar.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") void buscar();
+});
+climaResultados.addEventListener("change", () => {
+  const l = encontrados[Number(climaResultados.value)];
+  if (l) elegirCiudad(l);
+});
+climaQuitar.addEventListener("click", () => elegirCiudad(null));
+pintarCiudad();
 
 // ---------- Notificaciones de Windows ----------
 

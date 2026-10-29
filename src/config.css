@@ -67,6 +67,7 @@ label > span {
 }
 
 input[type="number"],
+input[type="text"],
 select {
   width: 64px;
   height: 24px;
@@ -84,7 +85,12 @@ select {
   min-width: 170px;
   text-align: left;
 }
+input[type="text"] {
+  width: 150px;
+  text-align: left;
+}
 input[type="number"]:focus,
+input[type="text"]:focus,
 select:focus {
   outline: 1px solid var(--azul);
 }

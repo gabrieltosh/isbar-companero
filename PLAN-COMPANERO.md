@@ -16,12 +16,12 @@ tarjeta en el panel. Sin ser pesado: los cambios breves se ignoran y cada aviso 
 
 ## Estado actual
 
-**Hechas: fases 0 a 4**, el reconocimiento de la música (mejoras 1 a 9) y la **primera parte de
-la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan».
+**Hechas: fases 0 a 4**, el reconocimiento de la música (mejoras 1 a 9) y de la **fase 6** el
+estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del plan».
 
 **Siguiente**, en este orden:
-1. **Clima** (Open-Meteo, ciudad en Configuración) con sus reacciones: saludo por la mañana con el
-   tiempo del día, paraguas si va a llover.
+1. ~~**Clima**~~ ✅ (Open-Meteo, ciudad en Configuración): saludo de buenos días con el tiempo del
+   día y paraguas si va a llover. Falta probarlo en Windows con la API real.
 2. **No molestar**: interruptor que silencia los globos un rato (30 min, 1 h, hasta mañana).
 3. **Panel nuevo**: barra de 7 iconos (la activa muestra su nombre): Inicio (solo resumen, no se
    gestiona nada desde ahí), Avisos, Música, Pomodoro, Pausas, Tareas y Sistema.
@@ -36,7 +36,7 @@ la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan»
 | 3. Globos, notificaciones y música | Hecha |
 | 4. Panel (Inicio, Avisos, Música) | Hecha; se reorganiza (ver «Siguiente») |
 | 5. Asistente | Pendiente |
-| 6. Estado del sistema y del día | En curso: sistema hecho; clima, no molestar y lo del día pendientes |
+| 6. Estado del sistema y del día | En curso: sistema y tiempo hechos; no molestar y lo del día pendientes |
 | 7. Pulido y publicación | Pendiente |
 
 ## Diseño acordado
@@ -81,7 +81,8 @@ la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan»
   Canta con el volumen; notas al ritmo; globo con la canción al cambiar de pista. Sin volumen,
   no baila.
 - **Estado sobre la cabeza**: progreso del Pomodoro en el borde; sin internet, una antena (busca
-  señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño.
+  señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño; si llueve
+  o va a llover, un paraguas azul (con gotas mientras llueve).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
 
 ## Arquitectura (como está hoy)
@@ -108,6 +109,8 @@ la fase 6** (estado del sistema con reacciones). Ver «Añadido fuera del plan»
 | `src/companero/entorno.ts` | Clasifica la ventana de debajo y recuerda sitios visitados |
 | `src/companero/respuestas.ts` | Gestos de sí, no y no sé al interactuar |
 | `src/companero/sistema.ts` | Reacciones al estado del PC: antena sin internet, batería, uso, volumen |
+| `src/companero/clima.ts` | El tiempo cada 30 min: buenos días con el tiempo, aviso de lluvia y paraguas |
+| `src/estado/clima.ts` | Open-Meteo: previsión y buscador de ciudades (desde el frontend, sin clave) |
 | `src/estado/*` | Pomodoro, agua, pausas y música (solo los arranca el compañero); tipos del sistema |
 | `src/panel/`, `src/globo/`, `config.html` | Panel, globo y configuración |
 
@@ -165,7 +168,14 @@ Cada fase termina con algo que funciona y se puede probar.
   cada minuto); al volver, la antena se ilumina y celebra. Batería al 20 % y al 10 %, al
   enchufarlo y al cargarse del todo. PC a tope (procesador 90 % durante 20 s) o sin memoria: suda.
   Volumen: icono un momento y sorpresa si lo subes mucho. Cambio de altavoces a cascos: lo dice.
-- Tiempo del día (Open-Meteo, sin clave) y saludo de buenos días y buenas noches.
+- ✅ Tiempo (Open-Meteo, sin clave ni dependencias nuevas). En Configuración se busca la ciudad
+  (solo se envía el nombre buscado y su posición). Lo mira cada 30 min (a los 5 si falla, y en
+  cuanto vuelve internet). Buenos días una vez al día (5–12 h, al usar el PC) con el tiempo de hoy,
+  la temperatura y un consejo (paraguas, calor, frío). Si va a llover en las próximas 3 horas
+  (≥ 60 %) o ya llueve, lo avisa una vez y lleva un paraguas sobre la cabeza. Al elegir ciudad,
+  cuenta el tiempo de allí. El panel enseña la temperatura junto a la fecha.
+  Se pide desde el frontend: Rust no tiene cliente HTTP y añadirlo sería una dependencia nueva.
+- Saludo de buenas noches.
 - No molestar.
 - Noche: sugerir descanso. Ritmo de trabajo: avisar tras mucho tiempo sin pausa. Rachas.
 

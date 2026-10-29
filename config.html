@@ -21,6 +21,14 @@
       </section>
 
       <section>
+        <h2>Tiempo</h2>
+        <p class="ayuda">Con una ciudad, el compañero te saluda por la mañana con el tiempo del día y te avisa si va a llover. Lo mira con <b>Open-Meteo</b> (gratis, sin cuenta): solo se envía el nombre que buscas y la posición de la ciudad.</p>
+        <label>Ciudad <span><output id="clima-ciudad"></output> <button type="button" class="probar" id="clima-quitar" hidden>Quitar</button></span></label>
+        <label>Buscar <span><input type="text" id="clima-buscar" placeholder="Nombre de la ciudad" maxlength="80" /> <button type="button" class="probar" id="clima-boton">Buscar</button></span></label>
+        <label id="clima-fila" hidden>Elige <select id="clima-resultados"></select></label>
+      </section>
+
+      <section>
         <h2>Notificaciones de Windows</h2>
         <p class="ayuda">El compañero te enseña tus notificaciones en globos. Para no verlas dos veces, activa <b>No molestar</b> (Windows 11) o el <b>Asistente de concentración: solo alarmas</b> (Windows 10), o quita los <b>banners</b> de cada app. Siguen llegando al Centro de notificaciones y el compañero las sigue viendo.</p>
         <label>Ajustes de notificaciones de Windows <button type="button" class="probar" id="ajustes-banners">Abrir</button></label>

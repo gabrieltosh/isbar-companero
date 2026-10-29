@@ -24,6 +24,8 @@ export interface EstadoPanel {
   musica: (InfoMedia & { posicion: number }) | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
   ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean } | null;
+  /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
+  clima: { temperatura: number; texto: string; ciudad: string } | null;
 }
 
 export type OrdenPanel =
