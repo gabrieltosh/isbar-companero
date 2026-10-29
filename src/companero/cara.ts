@@ -54,7 +54,12 @@ export interface Rasgos {
 }
 
 /** Cómo suena la música (ritmo.ts), para cantar y sacar notitas al ritmo. */
+/** Ojos al bailar: según el paso, felices, cerrados de gusto, abiertos o apretados. */
+export type OjosBaile = "felices" | "cerrados" | "abiertos" | "apretados";
+
 export interface MusicaPose {
+  /** Cuánto de cada tipo de ojos (suman 1; así se pasa de unos a otros sin saltos) */
+  ojos: Record<OjosBaile, number>;
   /** Nivel de ahora (0 a 1) */
   energia: number;
   /** Nivel medio de esta parte de la canción (0 a 1): tranquila o intensa */
@@ -175,10 +180,21 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
         const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
         return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
       }
-      // La boca se abre con el volumen; en las partes intensas aprieta los ojos de gusto
-      const a = 1 + Math.min(1, musica.energia * 2.2) * 6;
-      const intensa = limitar((musica.intensidad - 0.15) * 4, 0, 1);
-      return iguales(mezclarObj(OJO_FELIZ, ojo(11, 2.6, -2.6, 12), intensa), boca(9 + a * 0.4, -a, a, 0, 0, 3));
+      // Los ojos, según el paso de baile; la boca canta con el volumen
+      const formas: Record<OjosBaile, Ojo> = {
+        felices: OJO_FELIZ,
+        cerrados: ojo(10.5, 1.2, -1.4, 0, 0, 1),
+        abiertos: ojo(10.4, 5, 2.6),
+        apretados: ojo(11, 2.6, -2.6, 12),
+      };
+      let o = ojo(0, 0, 0);
+      for (const tipo of Object.keys(formas) as OjosBaile[]) {
+        const peso = musica.ojos[tipo];
+        const f = formas[tipo];
+        o = ojo(o.w + f.w * peso, o.t + f.t * peso, o.b + f.b * peso, o.giro + f.giro * peso, o.dx + f.dx * peso, o.dy + f.dy * peso);
+      }
+      const a = 1 + limitar(musica.energia, 0, 1) * 6;
+      return iguales(o, boca(9 + a * 0.4, -a, a, 0, 0, 3));
     }
     case "silba":
       return iguales(ojo(8.4, 4.2, 4.2, 0, 0, -1), boca(5.2, -2.6, 2.6, 0, 2, 3));

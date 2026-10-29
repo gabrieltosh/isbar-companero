@@ -12,6 +12,7 @@ import {
   mezclar,
   rasgosDe,
   type Expresion,
+  type OjosBaile,
   type Pose,
   type Rasgos,
 } from "./cara";
@@ -19,7 +20,8 @@ import { beber } from "../estado/agua";
 import { alternarPomodoro } from "../estado/pomodoro";
 import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
-import { VIDA_NOTA, apagarLatido, golpe, hayAudio, iniciarRitmo, ritmo } from "./ritmo";
+import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
+import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -102,6 +104,10 @@ const paseo = {
 };
 let ultimoFotograma = performance.now();
 const pose: Pose = { miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0 };
+/** Cómo se mueve el cuerpo al bailar (se acerca suave al paso de ahora) */
+const baile: Movimiento = { ...SIN_BAILE };
+/** Ojos del baile, mezclados para pasar de un paso a otro sin saltos */
+const ojosBaile: Record<OjosBaile, number> = { felices: 1, cerrados: 0, abiertos: 0, apretados: 0 };
 let expresionActual: Expresion = "normal";
 let progresoActual = 0;
 // Morph: al cambiar de cara, los rasgos van de los que se veían a los de la cara nueva.
@@ -138,11 +144,30 @@ function fotograma(ahora: number): void {
   }
   expresionActual = expresion;
   progresoActual = progreso;
-  // Con música y audio, canta y baila según cómo suena la canción
+  // Con música, baila: con audio, al pulso de la canción; sin él, a un pulso fijo
   const conRitmo = expresion === "musica" && hayAudio();
-  pose.musica = conRitmo
-    ? { energia: ritmo.energia, intensidad: ritmo.intensidad, notas: ritmo.notas, vidaNota: VIDA_NOTA }
-    : undefined;
+  let objetivoBaile = SIN_BAILE;
+  if (expresion === "musica") {
+    const paso = conRitmo
+      ? bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad)
+      : bailar(ahora, ahora / 500, 0.5 + Math.sin(ahora / 900) * 0.3, 0.5);
+    objetivoBaile = paso.mov;
+    for (const tipo of Object.keys(ojosBaile) as OjosBaile[]) {
+      ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === paso.ojos ? 1 : 0, 0.08);
+    }
+  } else {
+    pararBaile();
+  }
+  pose.musica =
+    expresion === "musica"
+      ? {
+          ojos: ojosBaile,
+          energia: conRitmo ? ritmo.energia : 0.4 + Math.abs(Math.sin(ahora / 180)) * 0.5,
+          intensidad: ritmo.intensidad,
+          notas: ritmo.notas,
+          vidaNota: VIDA_NOTA,
+        }
+      : undefined;
 
   // Mirada: escondido en un borde, hacia dentro; con el cursor cerca, lo sigue (ojos, cabeza
   // y se inclina un poco hacia él); solo, mira a su alrededor
@@ -203,14 +228,10 @@ function fotograma(ahora: number): void {
       salto = -Math.abs(Math.sin(ahora / 60)) * 2 * movimiento;
       break;
     case "musica":
-      if (conRitmo) {
-        // Se balancea hacia un lado en cada golpe y salta con él; más cuanto más intensa la canción
-        giro += ritmo.lado * 9 * Math.min(1, ritmo.media * 4) * movimiento;
-        salto = -ritmo.latido * (2.5 + ritmo.intensidad * 6) * movimiento;
-      } else {
-        giro += Math.sin(ahora / 130) * 10 * movimiento;
-        salto = -Math.abs(Math.sin(ahora / 130)) * 2.5 * movimiento;
-      }
+      // La cabeza sigue el paso de baile; mira hacia donde va
+      giro += objetivoBaile.giroCara * movimiento;
+      salto = objetivoBaile.saltoCara * movimiento;
+      pose.miraX = acercar(pose.miraX, objetivoBaile.miraX, 0.2);
       break;
     case "mareado":
       giro += Math.sin(ahora / 110) * 9;
@@ -225,7 +246,7 @@ function fotograma(ahora: number): void {
       giro += Math.sin(ahora / 30) * 1.5;
       break;
   }
-  pose.giro = acercar(pose.giro, giro, 0.2);
+  pose.giro = acercar(pose.giro, giro, expresion === "musica" ? 0.45 : 0.2);
   pose.salto = salto;
 
   // Cuerpo: se estira, bosteza o saluda; vuelve solo a su forma tras el rebote
@@ -267,12 +288,21 @@ function fotograma(ahora: number): void {
   const colgando = arrastrando || Math.abs(paseo.angulo) > 0.4 || Math.abs(paseo.velAngular) > 0.05;
   companero.style.transformOrigin = colgando ? "50% 12%" : "50% 100%";
 
+  // Baile: el cuerpo sigue el paso (y vuelve suave a su sitio al acabar la música)
+  for (const c of Object.keys(baile) as (keyof Movimiento)[]) {
+    const quieto = c === "sx" || c === "sy" ? 1 : 0;
+    baile[c] = acercar(baile[c], quieto + (objetivoBaile[c] - quieto) * movimiento, 0.4);
+  }
+
   // Respira: más lento de noche, más suave en modo tranquilo
   const respira = 1 + Math.sin(ahora / (noche ? 520 : 320)) * (config.tranquilo ? 0.01 : 0.018);
   const agarre = arrastrando ? 1.12 : 1;
-  const sx = respira * agarre * escalaX * estiraX;
-  const sy = respira * agarre * escalaY * estiraY;
-  companero.style.transform = `translate(${inclinacion.x.toFixed(2)}px, ${inclinacion.y.toFixed(2)}px) rotate(${paseo.angulo.toFixed(2)}deg) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
+  const sx = respira * agarre * escalaX * estiraX * baile.sx;
+  const sy = respira * agarre * escalaY * estiraY * baile.sy;
+  const tx = inclinacion.x + baile.x;
+  const ty = inclinacion.y + baile.y;
+  const rot = paseo.angulo + baile.rot;
+  companero.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
   // De noche, dormido, se ve más tenue
   companero.style.opacity = noche && expresion === "dormido" ? "0.8" : "1";
 
@@ -510,12 +540,6 @@ listen("menu-pomodoro", () => {
   alternarPomodoro();
   gesto("guino", DURACION_GUINO);
 }).catch(console.error);
-// En cada golpe de la música, un pequeño aplastamiento del cuerpo
-golpe.escuchar(() => {
-  if (expresionActual !== "musica" || config.tranquilo) return;
-  escalaX = Math.max(escalaX, 1.05);
-  escalaY = Math.min(escalaY, 0.94);
-});
 
 // Se intentó abrir la app otra vez: el compañero que ya está saluda
 listen("otra-copia", () => gesto("saludo", 2200)).catch(console.error);
