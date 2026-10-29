@@ -27,6 +27,9 @@ export type Expresion =
   | "musica"
   | "notificacion"
   | "curioso"
+  | "lupa"
+  | "otea"
+  | "asoma"
   | "frustrado"
   | "impresionado";
 
@@ -155,6 +158,17 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
     case "curioso":
       // Un ojo muy abierto y el otro entornado, como quien examina algo; boquita de lado
       return { izq: OJO_GRANDE, der: ojo(9.6, 2, 4, 10, 0, 1), boca: boca(6, -2.4, 2.4, 0, 3, 3) };
+    case "lupa":
+      // Examina con una lupa: el ojo de detrás del cristal se ve enorme
+      return { izq: ojo(8.6, 3.6, 4.2, 0, 0, 1), der: ojo(13.4, 6.8, 6.8), boca: boca(7, -1, -1, 0, -2, 3) };
+    case "otea":
+      // Mano de visera y ojos entornados, como quien mira a lo lejos
+      return iguales(ojo(10, 1.8, 4, 0, 0, 1), boca(8, -1.6, 1.6, 0, 0, 3));
+    case "asoma": {
+      // Se asoma con los ojos entornados, desconfiado, y la boca apretada de lado a lado
+      const lado = Math.sin(t / 400) * 2;
+      return iguales(ojo(10.6, 1.4, 3.2, 0, 0, 1), boca(9, -0.8, -0.8, 0, lado, 3));
+    }
     case "frustrado":
       // Párpados planos medio cerrados (-_-) y boca de "hmpf" torcida
       return iguales(ojo(10.5, 0.3, 2.6, 0, 0, 2), boca(11, -1, 1.2, -9, 2, 3));
@@ -341,6 +355,35 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
         `<path d="${q}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none"/>` +
         `<circle cx="0" cy="5" r="1.4" ${conBorde(c)}/></g>`
       );
+    }
+    case "lupa": {
+      // La lupa delante del ojo derecho, siguiendo la mirada
+      const x = OJO_DER.x + p.miraX;
+      const y = OJO_DER.y + p.miraY + p.salto;
+      return (
+        `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">` +
+        `<path d="M${n(x + 6.5)} ${n(y + 6.5)}l7 7" stroke="${BORDE}" stroke-width="${n(3.6 + GROSOR_BORDE * 2)}" stroke-linecap="round"/>` +
+        `<path d="M${n(x + 6.5)} ${n(y + 6.5)}l7 7" stroke="${c}" stroke-width="3.6" stroke-linecap="round"/>` +
+        `<circle cx="${n(x)}" cy="${n(y)}" r="9" fill="none" stroke="${BORDE}" stroke-width="${n(2.2 + GROSOR_BORDE * 2)}"/>` +
+        `<circle cx="${n(x)}" cy="${n(y)}" r="9" fill="none" stroke="${c}" stroke-width="2.2"/></g>`
+      );
+    }
+    case "otea": {
+      // La mano de visera: plana, sobre el ojo del lado hacia el que mira, saliendo por el borde
+      const lado = p.miraX >= 0 ? 1 : -1;
+      const ojoLado = lado > 0 ? OJO_DER : OJO_IZQ;
+      const x = ojoLado.x + p.miraX + lado * 4;
+      const y = ojoLado.y + p.miraY - 8 + Math.sin(t / 300) * 0.5;
+      return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)"><rect x="${n(x - 9)}" y="${n(y - 3)}" width="18" height="6" rx="3" transform="rotate(${-lado * 12} ${n(x)} ${n(y)})" ${conBorde(c)}/></g>`;
+    }
+    case "asoma": {
+      // Puntos suspensivos que aparecen uno tras otro
+      let r = "";
+      const k = (t % 1800) / 600;
+      for (let i = 0; i < 3; i++) {
+        if (k >= i) r += `<circle cx="${50 + i * 5}" cy="6" r="1.6" ${conBorde(c)}/>`;
+      }
+      return r;
     }
     case "frustrado": {
       // Resopla: nubecitas que salen por arriba y se desvanecen

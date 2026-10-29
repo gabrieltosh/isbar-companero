@@ -186,9 +186,10 @@ function fotograma(ahora: number): void {
     // Mira hacia donde lo llevas
     miraX = Math.max(-4, Math.min(4, paseo.vx * 3));
     miraY = Math.max(-3.5, Math.min(3.5, paseo.vy * 3));
-  } else if (expresion === "curioso") {
+  } else if (curioseoActual && expresion === curioseoActual.expresion) {
     // Examina su nuevo sitio: mira a un lado y a otro, inclinándose hacia donde mira
-    const tramo = MIRADAS_CURIOSEO[Math.min(MIRADAS_CURIOSEO.length - 1, Math.floor(progreso * MIRADAS_CURIOSEO.length))];
+    const miradas = curioseoActual.miradas;
+    const tramo = miradas[Math.min(miradas.length - 1, Math.floor(progreso * miradas.length))];
     [miraX, miraY] = tramo;
     inclinaX = miraX * 0.9;
     inclinaY = miraY * 0.6;
@@ -250,9 +251,14 @@ function fotograma(ahora: number): void {
       giro += 10;
       break;
     case "curioso":
+    case "lupa":
+    case "otea":
+    case "asoma":
       // Ladea la cabeza, con un saltito al mirar a otro sitio
-      giro += 9;
-      salto = -Math.max(0, Math.sin(progreso * MIRADAS_CURIOSEO.length * Math.PI * 2)) * 1.2 * movimiento;
+      if (curioseoActual) {
+        giro += curioseoActual.ladeo;
+        salto = -Math.max(0, Math.sin(progreso * curioseoActual.miradas.length * Math.PI * 2)) * 1.2 * movimiento;
+      }
       break;
     case "frustrado":
       // Se desinfla un poco
@@ -396,7 +402,7 @@ companero.addEventListener("pointerdown", (e) => {
     // Un saltito al cogerlo
     Object.assign(paseo, { desde: performance.now(), vx: 0, vy: 0, ultima: null, sacudidas: [], direccion: 0 });
     // Si estaba curioseando, lo deja
-    if (expresionActual === "curioso") {
+    if (curioseoActual && expresionActual === curioseoActual.expresion) {
       curioseo += 1;
       gesto("normal", 0);
     }
@@ -444,7 +450,23 @@ window.addEventListener("pointerup", () => {
 });
 
 // Tras moverlo a otro sitio, curiosea lo que hay alrededor y reacciona (cada vez distinto)
-const DURACION_CURIOSEO = 3000;
+/** Formas de examinar el nuevo sitio: cara, cuánto dura, hacia dónde mira por tramos y cuánto ladea la cabeza. */
+interface Curioseo {
+  expresion: Expresion;
+  ms: number;
+  miradas: [number, number][];
+  ladeo: number;
+}
+const CURIOSEOS: Curioseo[] = [
+  // Con un interrogante: abajo a un lado, al otro, al frente y arriba
+  { expresion: "curioso", ms: 3000, miradas: [[-3.8, 3], [-3.8, 3.4], [3.8, 3], [3.8, 2.6], [0, 4], [2.5, -2.5]], ladeo: 9 },
+  // Con lupa: barre despacio de un lado a otro mirando de cerca
+  { expresion: "lupa", ms: 3400, miradas: [[-3, 3.5], [-1.5, 3.8], [0, 4], [1.5, 3.8], [3, 3.5], [0, 2]], ladeo: 4 },
+  // De visera: mira a lo lejos, muy a un lado y al otro
+  { expresion: "otea", ms: 2800, miradas: [[-4, -1], [-4, -1.5], [4, -1], [4, -1.5]], ladeo: 0 },
+  // Se asoma desconfiado: mira abajo, de reojo a los lados
+  { expresion: "asoma", ms: 2600, miradas: [[0, 4], [-3.5, 3.5], [0, 4], [3.5, 3.5]], ladeo: -6 },
+];
 /** Lo mínimo que hay que llevarlo para que curiosee al soltarlo (ms). */
 const MINIMO_PASEO_CURIOSEO = 350;
 const REACCIONES: [Expresion, number][] = [
@@ -456,30 +478,31 @@ const REACCIONES: [Expresion, number][] = [
   ["risa", 1500],
   ["triste", 1800],
 ];
-/** Hacia dónde mira mientras curiosea (por tramos del gesto): abajo a un lado, al otro, al frente… */
-const MIRADAS_CURIOSEO: [number, number][] = [
-  [-3.8, 3],
-  [-3.8, 3.4],
-  [3.8, 3],
-  [3.8, 2.6],
-  [0, 4],
-  [2.5, -2.5],
-];
 let curioseo = 0;
+let ultimoCurioseo = -1;
 let ultimaReaccion = -1;
+/** Cómo está curioseando ahora (o null). */
+let curioseoActual: Curioseo | null = null;
+
+/** Un índice al azar que no sea el de la última vez. */
+function otroAlAzar(total: number, ultimo: number): number {
+  const i = Math.floor(Math.random() * total);
+  return i === ultimo ? (i + 1) % total : i;
+}
 
 function curiosear(): void {
   const id = ++curioseo;
-  gesto("curioso", DURACION_CURIOSEO);
+  ultimoCurioseo = otroAlAzar(CURIOSEOS.length, ultimoCurioseo);
+  const forma = CURIOSEOS[ultimoCurioseo];
+  curioseoActual = forma;
+  gesto(forma.expresion, forma.ms);
   setTimeout(() => {
     // Si lo volviste a coger (u otra cosa lo interrumpió), no reacciona
-    if (id !== curioseo || arrastrando || expresionActual !== "curioso") return;
-    let i = Math.floor(Math.random() * REACCIONES.length);
-    if (i === ultimaReaccion) i = (i + 1) % REACCIONES.length;
-    ultimaReaccion = i;
-    const [expresion, ms] = REACCIONES[i];
+    if (id !== curioseo || arrastrando || expresionActual !== forma.expresion) return;
+    ultimaReaccion = otroAlAzar(REACCIONES.length, ultimaReaccion);
+    const [expresion, ms] = REACCIONES[ultimaReaccion];
     gesto(expresion, ms);
-  }, DURACION_CURIOSEO);
+  }, forma.ms);
 }
 
 // Al soltarlo: rebota, recuerda dónde quedó y si está escondido en un borde
