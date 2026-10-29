@@ -62,6 +62,14 @@ const RIGIDEZ = 0.1;
 const AMORTIGUACION = 0.16;
 /** Sacudirlo así de veces mientras lo llevas lo deja mareado al soltarlo. */
 const SACUDIDAS_MAREO = 4;
+/** Canta cuando la voz de la canción pasa de esto (0 a 1). */
+const VOZ_CANTA = 0.45;
+/** Canción muy triste (tono de Jev por debajo): ojos cerrados y alguna lágrima. Muy alegre e
+ * intensa (tono y energía por encima, en el estribillo): puño en alto. */
+const TONO_LAGRIMA = 0.8;
+const TONO_PUNO = 3;
+const ENERGIA_PUNO = 3.3;
+const ESTRIBILLO = 0.7;
 /** Teclado activo con el ratón quieto este tiempo = se está escribiendo. */
 const ESCRIBIENDO_MS = 2500;
 /** Este tiempo sin usar el PC termina la sesión (el cansancio por llevar mucho rato vuelve a cero). */
@@ -194,7 +202,11 @@ function fotograma(ahora: number): void {
     const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
-    cantaObjetivo = paso.canta ? 1 : 0;
+    // Canta cuando el paso lo pide y además se oye la voz (así parece que canta la letra)
+    cantaObjetivo = paso.canta && ritmo.voz > VOZ_CANTA ? 1 : 0;
+    // Muy triste: los ojos felices se cierran
+    const tonoJev = caracterActual()?.tono;
+    if (tonoJev != null && tonoJev < TONO_LAGRIMA && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
   } else if (expresion === "asiente") {
     // El cuerpo acompaña el sí
     objetivoBaile = { ...SIN_BAILE, y: Math.max(0, Math.sin(progreso * Math.PI * 6)) * 1.5 * (1 - progreso) };
@@ -224,16 +236,29 @@ function fotograma(ahora: number): void {
     ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === ojosObjetivo ? 1 : 0, 0.08);
   }
   canto = acercar(canto, cantaObjetivo, 0.06);
+  const caracterJev = caracterActual();
+  // Puño en alto con cada pulso: canción muy alegre e intensa, en su parte más fuerte
+  const puno =
+    conRitmo &&
+    !ritmo.pausa &&
+    (caracterJev?.tono ?? 0) > TONO_PUNO &&
+    (caracterJev?.energia ?? 0) > ENERGIA_PUNO &&
+    ritmo.intensidad > ESTRIBILLO
+      ? Math.exp(-(pulsoAhora() % 1) * 5)
+      : undefined;
   pose.musica =
     expresion === "musica"
       ? {
           ojos: ojosBaile,
           canta: canto,
           energia: conRitmo ? ritmo.energia : 0,
+          voz: conRitmo ? ritmo.voz : undefined,
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
           vidaNota: VIDA_NOTA,
-          tono: caracterActual()?.tono,
+          tono: caracterJev?.tono ?? undefined,
+          lagrima: (caracterJev?.tono ?? 4) < TONO_LAGRIMA,
+          puno,
         }
       : undefined;
 
@@ -884,7 +909,7 @@ gesto("saludo", 2600);
 iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
-iniciarCaracter();
+void iniciarCaracter();
 iniciarSistema();
 void iniciarClima();
 iniciarRespuestas();

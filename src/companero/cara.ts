@@ -84,6 +84,12 @@ export interface MusicaPose {
   vidaNota: number;
   /** Tono de la canción según Jev (0 muy triste … 4 muy alegre): cambia la cara al bailar, si se sabe */
   tono?: number;
+  /** Cuánta voz se oye (0 a 1): la boca canta con ella; sin esto, con el volumen */
+  voz?: number;
+  /** Canción muy triste: de vez en cuando cae una lágrima */
+  lagrima?: boolean;
+  /** Puño en alto, con su golpe en cada pulso (1 → 0), o nada */
+  puno?: number;
 }
 
 /** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
@@ -250,7 +256,7 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
         const f = formas[tipo];
         o = ojo(o.w + f.w * peso, o.t + f.t * peso, o.b + f.b * peso, o.giro + f.giro * peso, o.dx + f.dx * peso, o.dy + f.dy * peso);
       }
-      const a = 1 + limitar(musica.energia, 0, 1) * 4.5;
+      const a = 1 + limitar(musica.voz ?? musica.energia, 0, 1) * 4.5;
       const cantando = boca(9 + a * 0.4, -a, a, 0, 0, 3);
       let sonriendo = boca(13, 4, 4.5, 0, 0, 2);
       // El tono de la canción (Jev), poco a poco: cuanto más triste, más caídas las cejas y menos
@@ -354,6 +360,24 @@ const nota = (x: number, y: number, k: number, c: string) =>
   `<circle cx="-1.5" cy="0" r="${n(2 + GROSOR_BORDE)}" fill="${BORDE}"/><circle cx="4.5" cy="-2" r="${n(2 + GROSOR_BORDE)}" fill="${BORDE}"/>` +
   `<path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" stroke-linejoin="round" fill="none"/>` +
   `<circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
+
+/** Canción muy triste: cada pocos segundos resbala una lágrima del ojo izquierdo. */
+function lagrima(t: number, p: Pose, c: string): string {
+  if (!p.musica?.lagrima) return "";
+  const k = (t % 5200) / 2200;
+  if (k >= 1) return "";
+  const x = OJO_IZQ.x - 4 + p.miraX;
+  const y = OJO_IZQ.y + 6 + p.miraY + p.salto + k * 12;
+  const d = `M${n(x)} ${n(y)}c1.4 1.9 2.2 2.9 2.2 3.8a2.2 2.2 0 0 1 -4.4 0c0 -0.9 0.8 -1.9 2.2 -3.8z`;
+  return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)" opacity="${n(Math.min(1, (1 - k) * 2))}"><path d="${d}" ${conBorde(c)}/></g>`;
+}
+
+/** Puño en alto: solo un círculo (como las otras manitas) junto a la cabeza, que sube con cada
+ * pulso (golpe de 1 a 0). */
+function puno(golpe: number | undefined, c: string): string {
+  if (golpe === undefined) return "";
+  return `<circle cx="68" cy="${n(6 - golpe * 5)}" r="4.4" ${conBorde(c)}/>`;
+}
 
 /** Dónde está la pelotita al jugar (bota sobre la cabeza, de un lado a otro). */
 export function pelota(t: number): { x: number; y: number; altura: number } {
@@ -474,11 +498,12 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
       if (p.musica) {
         // Notitas que salen con los golpes de la canción, de un lado o del otro
         const vida = p.musica.vidaNota;
-        return p.musica.notas
+        const notas = p.musica.notas
           .map((nt) => ({ k: (t - nt.nace) / vida, lado: nt.lado }))
           .filter(({ k }) => k >= 0 && k < 1)
           .map(({ k, lado }) => (lado > 0 ? nota(58, 30, k, c) : nota(-4, 26, k, c)))
           .join("");
+        return notas + lagrima(t, p, c) + puno(p.musica.puno, c);
       }
       return nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
     case "silba":

@@ -72,7 +72,18 @@
             <button class="icono-boton principal mg-play" data-musica="play" aria-label="Reproducir o pausar"></button>
             <button class="icono-boton" data-musica="siguiente" aria-label="Siguiente"></button>
           </div>
-          <small class="mg-caracter" hidden></small>
+          <button class="mg-caracter" hidden title="Corregir lo que dice Jev de esta canción"></button>
+          <div class="mg-corregir" hidden>
+            <div class="fila">
+              <button class="boton" data-corregir="tono" data-paso="-0.75">Más triste</button>
+              <button class="boton" data-corregir="tono" data-paso="0.75">Más alegre</button>
+            </div>
+            <div class="fila">
+              <button class="boton" data-corregir="energia" data-paso="-0.75">Más calmada</button>
+              <button class="boton" data-corregir="energia" data-paso="0.75">Más movida</button>
+            </div>
+            <div class="fila estilos-corregir"></div>
+          </div>
           <small class="mg-ritmo" hidden></small>
         </div>
         <p class="vacio" id="sin-musica">No suena nada ahora mismo.</p>

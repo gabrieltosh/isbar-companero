@@ -52,6 +52,9 @@ fn fijar_app_actual(app: Option<String>) {
 pub struct InfoMedia {
     titulo: String,
     artista: String,
+    /// Álbum y géneros, si el reproductor los da (pistas para Jev; vacíos si no)
+    album: String,
+    generos: Vec<String>,
     reproduciendo: bool,
     duracion_ms: f64,
     posicion_ms: f64,
@@ -204,6 +207,12 @@ fn leer(sesion: &Sesion, caratula: &mut CacheCaratula) -> WinResult<InfoMedia> {
     let propiedades = sesion.TryGetMediaPropertiesAsync()?.join()?;
     let titulo = propiedades.Title()?.to_string();
     let artista = propiedades.Artist()?.to_string();
+    // No todos los reproductores los dan: si fallan, vacíos
+    let album = propiedades.AlbumTitle().map(|a| a.to_string()).unwrap_or_default();
+    let generos = propiedades
+        .Genres()
+        .map(|g| g.into_iter().map(|x| x.to_string()).filter(|x| !x.is_empty()).collect())
+        .unwrap_or_default();
 
     let reproduciendo = sesion
         .GetPlaybackInfo()
@@ -223,6 +232,8 @@ fn leer(sesion: &Sesion, caratula: &mut CacheCaratula) -> WinResult<InfoMedia> {
     Ok(InfoMedia {
         titulo,
         artista,
+        album,
+        generos,
         reproduciendo,
         duracion_ms,
         posicion_ms,

@@ -6,6 +6,9 @@ import { crearSenal } from "./senal";
 export interface InfoMedia {
   titulo: string;
   artista: string;
+  /** Álbum y géneros, si el reproductor los da (vacíos si no) */
+  album: string;
+  generos: string[];
   reproduciendo: boolean;
   duracionMs: number;
   posicionMs: number;

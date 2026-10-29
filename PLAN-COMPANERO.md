@@ -421,6 +421,22 @@ Hoy las reacciones salen de reglas fijas. Jev decidiría lo que con reglas queda
      cabeceo, headbang, metrónomo, sin saltos). La cara va de cejas caídas y boca hacia abajo
      (triste) a una sonrisa más amplia (muy alegre), poco a poco.
    - En el panel → Música se ve qué dijo Jev y el paso que está bailando.
+   - **Más pistas**: también el álbum (y los géneros, si el reproductor los da; Spotify no).
+   - **Una vez por canción y recordado**: el tono y la energía se preguntan una sola vez; en las
+     partes nuevas, solo el género. Lo que se sabe de cada canción se guarda (hasta 400): al
+     volver a oírla baila con su estilo desde el primer segundo.
+   - **Corregir a Jev**: pulsando su línea en Música, «más triste / más alegre», «más calmada /
+     más movida» u otro género. Se recuerda para esa canción y Jev ya no lo cambia.
+   - **Mezcla de géneros**: si Jev duda (55 % rock, 40 % balada), en cada cambio de paso se sortea
+     el género según su peso; la amplitud es la media de la mezcla.
+   - **Estribillo**: en las partes intensas se mueve más (×0,85 a ×1,15) y canta más a menudo.
+   - **Canto con la voz**: canta cuando se oye voz (los medios del audio) y la boca la sigue.
+   - **Medio tiempo**: si Jev dice que es calmada pero se mide un tempo rápido (> 100 ppm), baila
+     a la mitad.
+   - **Expresiones**: muy triste (tono < 0,8), ojos cerrados y de vez en cuando una lágrima; muy
+     alegre e intensa (tono > 3, energía > 3,3) en el estribillo, puño en alto (una manita).
+   - **Prueba**: `npm run jev:probar` (scripts/probar-jev.ts) hace las mismas preguntas con 12
+     canciones y 8 notificaciones y compara con lo esperado (hoy: 44 de 44).
 6. Saber qué estás haciendo (reunión, código, vídeo…) para ajustar cuánto habla.
 7. Experimento «qué hacer ahora».
 

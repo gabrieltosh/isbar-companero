@@ -155,31 +155,38 @@ export const NOTIFICACIONES_EJEMPLO: (DatosNotificacion & { esperado: Importanci
 
 export type Estilo = "rock" | "pop" | "electronica" | "balada" | "tranquila" | "fiesta";
 
-/** Lo que se le cuenta a Jev de la canción: título y artista, y los números del ritmo (nunca el audio). */
+/** Lo que se le cuenta a Jev de la canción: título, artista, álbum y géneros (si el reproductor
+ * los da), y los números del ritmo (nunca el audio). */
 export interface DatosCancion {
   titulo: string;
   artista: string;
+  album?: string;
+  generos?: string[];
   /** Pulsos por minuto, o null si aún no se sabe */
   ppm: number | null;
   /** Lo intensa que es esta parte (0 a 1), o null */
   intensidad: number | null;
 }
 
-/**
- * Cómo es la canción: el tono y la energía en dos escalas (de 0 a 4, con decimales: si Jev duda,
- * quedan en medio, así que nunca exageran) y el género de baile.
- */
-export interface Caracter {
+/** El tono y la energía en dos escalas (de 0 a 4, con decimales: si Jev duda, quedan en medio,
+ * así que nunca exageran). No cambian de una parte a otra: se preguntan una vez por canción. */
+export interface Emocion {
   /** 0 muy triste · 1 algo triste · 2 neutra o agridulce · 3 alegre · 4 muy alegre */
   tono: number;
   /** 0 para escuchar quieto · 1 para mecerse · 2 para moverse un poco · 3 para bailar · 4 para saltar */
   energia: number;
-  estilo: Estilo;
-  /** Confianza de cada respuesta (0 a 1) */
   confianzaTono: number;
   confianzaEnergia: number;
-  confianzaEstilo: number;
 }
+
+/** El género de baile más probable y la probabilidad de cada uno (para mezclar si duda entre dos). */
+export interface EstiloBaile {
+  estilo: Estilo;
+  confianzaEstilo: number;
+  probabilidades: Partial<Record<Estilo, number>>;
+}
+
+export type Caracter = Emocion & EstiloBaile;
 
 /** Los niveles de las dos escalas (probadas con canciones reales: mejor que elegir un ánimo cerrado,
  * donde la probabilidad se repartía entre ánimos parecidos como triste y nostálgica). */
@@ -210,48 +217,64 @@ export function limpiarTitulo(titulo: string): { titulo: string; enVivo: boolean
   return { titulo: limpio || titulo, enVivo: EN_VIVO.test(titulo) };
 }
 
+/** Pistas que no son la canción en sí: el álbum (limpio) y los géneros, si los hay. */
+function pistas(c: DatosCancion): Record<string, string> {
+  const r: Record<string, string> = {};
+  if (c.album?.trim()) r.album = limpiarTitulo(c.album).titulo;
+  if (c.generos?.length) r.generos = c.generos.join(", ");
+  return r;
+}
+
 /**
- * Pregunta a Jev, en dos consultas a la vez, el tono y la energía de la canción (solo con el
- * título limpio y el artista: el volumen y el tempo de un directo no dicen si la letra es triste)
- * y qué baile le va (con todo: título, artista, tempo e intensidad).
+ * Pregunta a Jev el tono y la energía de la canción, solo con el título limpio, el artista y el
+ * álbum: el volumen y el tempo de un directo no dicen si la letra es triste.
  */
-export async function caracterCancion(clave: string, c: DatosCancion): Promise<Caracter> {
+export async function emocionCancion(clave: string, c: DatosCancion): Promise<Emocion> {
+  const { titulo } = limpiarTitulo(c.titulo);
+  const { respuestas } = await preguntarJev(
+    clave,
+    { cancion: titulo, artista: c.artista, ...pistas(c) },
+    {
+      tono: {
+        type: "score",
+        instructions: "Qué tono emocional tiene esta canción por su letra y su tema (no por su volumen ni su ritmo)",
+        criteria: TONOS,
+      },
+      energia: { type: "score", instructions: "Cuánta energía tiene esta canción para bailar", criteria: ENERGIAS },
+    },
+  );
+  return {
+    tono: respuestas.tono.score,
+    energia: respuestas.energia.score,
+    confianzaTono: respuestas.tono.confidence,
+    confianzaEnergia: respuestas.energia.confidence,
+  };
+}
+
+/** Pregunta a Jev qué baile le va, con todo: título, artista, álbum, géneros, tempo e intensidad. */
+export async function estiloCancion(clave: string, c: DatosCancion): Promise<EstiloBaile> {
   const { titulo, enVivo } = limpiarTitulo(c.titulo);
   const parte = c.intensidad === null ? "desconocida" : c.intensidad < 0.35 ? "tranquila" : c.intensidad < 0.7 ? "media" : "intensa";
-  const [emocion, baile] = await Promise.all([
-    preguntarJev(
-      clave,
-      { cancion: titulo, artista: c.artista },
-      {
-        tono: {
-          type: "score",
-          instructions: "Qué tono emocional tiene esta canción por su letra y su tema (no por su volumen ni su ritmo)",
-          criteria: TONOS,
-        },
-        energia: { type: "score", instructions: "Cuánta energía tiene esta canción para bailar", criteria: ENERGIAS },
-      },
-    ),
-    preguntarJev(
-      clave,
-      {
-        cancion: titulo,
-        artista: c.artista,
-        version: enVivo ? "en vivo (el público y el volumen del directo no cambian el estilo)" : "de estudio",
-        tempo: c.ppm === null ? "desconocido" : `${c.ppm} pulsos por minuto`,
-        parte_de_la_cancion: parte,
-      },
-      { estilo: { type: "choice", instructions: "Qué género musical y forma de bailar le va a esta canción", criteria: ESTILOS } },
-    ),
-  ]);
-  const { tono, energia } = emocion.respuestas;
-  const e = baile.respuestas.estilo;
-  const estilo = (e.choice in ESTILOS ? e.choice : "pop") as Estilo;
-  return {
-    tono: tono.score,
-    energia: energia.score,
-    estilo,
-    confianzaTono: tono.confidence,
-    confianzaEnergia: energia.confidence,
-    confianzaEstilo: e.confidence,
-  };
+  const { respuestas } = await preguntarJev(
+    clave,
+    {
+      cancion: titulo,
+      artista: c.artista,
+      ...pistas(c),
+      version: enVivo ? "en vivo (el público y el volumen del directo no cambian el estilo)" : "de estudio",
+      tempo: c.ppm === null ? "desconocido" : `${c.ppm} pulsos por minuto`,
+      parte_de_la_cancion: parte,
+    },
+    { estilo: { type: "choice", instructions: "Qué género musical y forma de bailar le va a esta canción", criteria: ESTILOS } },
+  );
+  const e = respuestas.estilo;
+  const probabilidades: Partial<Record<Estilo, number>> = {};
+  for (const [k, v] of Object.entries(e.probabilities)) if (k in ESTILOS) probabilidades[k as Estilo] = v;
+  return { estilo: (e.choice in ESTILOS ? e.choice : "pop") as Estilo, confianzaEstilo: e.confidence, probabilidades };
+}
+
+/** Las dos preguntas a la vez (la emoción y el estilo). */
+export async function caracterCancion(clave: string, c: DatosCancion): Promise<Caracter> {
+  const [emocion, estilo] = await Promise.all([emocionCancion(clave, c), estiloCancion(clave, c)]);
+  return { ...emocion, ...estilo };
 }

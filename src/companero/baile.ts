@@ -432,17 +432,21 @@ let celebrar = false;
 let celebrarHasta = 0;
 /** Si canta en este paso (si no, sonríe con la boca cerrada). */
 let canta = false;
-/** Cómo es la canción según Jev: tono y energía (escalas de 0 a 4) y género (null si duda), o
- * null (se baila solo por intensidad y tempo). */
+/** Cómo es la canción según Jev: tono y energía (escalas de 0 a 4) y mezcla de géneros (null si
+ * duda), o null (se baila solo por intensidad y tempo). */
 export interface CaracterBaile {
   /** 0 muy triste … 4 muy alegre */
   tono: number | null;
   /** 0 para escuchar quieto … 4 para saltar */
   energia: number | null;
-  estilo: Estilo | null;
+  /** Peso de cada género (suman 1): normalmente uno solo; si Jev duda, varios */
+  estilos: Partial<Record<Estilo, number>> | null;
 }
 let caracter: CaracterBaile | null = null;
 
+/** Medio tiempo: con energía por debajo y un tempo medido por encima, se baila a la mitad. */
+const ENERGIA_MEDIO_TIEMPO = 1.75;
+const PPM_MEDIO_TIEMPO = 100;
 /** Por debajo de este tono es triste: no salta ni celebra con saltos, aunque tenga energía. */
 const TONO_TRISTE = 1.5;
 /** Por debajo de esta energía no salta; por debajo de la de calma, solo pasos lentos. */
@@ -472,7 +476,10 @@ const AMPLITUD_ESTILO: Record<Estilo, number> = {
  * triste, contenida (como mucho ×1, aunque sea rock). */
 function amplitudBaile(): number {
   if (!caracter) return 1;
-  let a = caracter.estilo ? AMPLITUD_ESTILO[caracter.estilo] : 1;
+  // La del género, o la media de los géneros de la mezcla
+  let a = caracter.estilos
+    ? Object.entries(caracter.estilos).reduce((s, [e, w]) => s + AMPLITUD_ESTILO[e as Estilo] * (w ?? 0), 0)
+    : 1;
   if (caracter.energia != null) a *= 0.75 + 0.15 * caracter.energia;
   return triste() ? Math.min(1, a * 0.8) : a;
 }
@@ -534,7 +541,8 @@ function elegir(animado: number, ppm: number): Paso {
   const disponible = (p: Paso) =>
     (!p.ppm || (ppm >= p.ppm[0] && ppm <= p.ppm[1])) && (saltar || !p.salta) && p.desde <= desdeMax;
   // Con el género de Jev, solo los pasos de ese género (sin repetir los últimos mientras se pueda)
-  const estilo = caracter?.estilo;
+  // Si hay mezcla (Jev duda entre géneros), cada vez se sortea uno según su peso
+  const estilo = caracter?.estilos ? sortearGenero(caracter.estilos) : null;
   if (estilo) {
     const genero = PASOS.filter((p) => p.estilos.includes(estilo) && disponible(p));
     if (genero.length >= 2) {
@@ -548,6 +556,17 @@ function elegir(animado: number, ppm: number): Paso {
   const nuevos = encaja.filter((p) => !recientes.includes(p.nombre));
   const opciones = nuevos.length ? nuevos : PASOS.filter((p) => p !== actual && disponible(p));
   return sortear(opciones.length ? opciones : PASOS.filter((p) => p !== actual), animado);
+}
+
+/** Un género de la mezcla, al azar según su peso. */
+function sortearGenero(estilos: Partial<Record<Estilo, number>>): Estilo | null {
+  const lista = Object.entries(estilos) as [Estilo, number][];
+  let suerte = Math.random() * lista.reduce((a, [, w]) => a + w, 0);
+  for (const [e, w] of lista) {
+    suerte -= w;
+    if (suerte <= 0) return e;
+  }
+  return lista.length ? lista[lista.length - 1][0] : null;
 }
 
 /** Sortea entre las opciones: más a menudo las que tienen el centro de su rango más cerca de lo animada que está la música. */
@@ -587,6 +606,12 @@ export function bailar(
   intervalo: number,
   pausa = false,
 ): { mov: Movimiento; ojos: OjosBaile; canta: boolean } {
+  // Medio tiempo: si Jev dice que la canción es calmada pero el ritmo medido es rápido (pasa a
+  // menudo en directos y baladas con mucha percusión), se baila a la mitad
+  if (caracter?.energia != null && caracter.energia < ENERGIA_MEDIO_TIEMPO && 60_000 / intervalo > PPM_MEDIO_TIEMPO) {
+    pulso /= 2;
+    intervalo *= 2;
+  }
   const b = Math.floor(pulso / PULSOS_POR_PASO);
   const c = Math.floor(pulso / 4);
   const empiezaCompas = c !== compas;
@@ -613,13 +638,15 @@ export function bailar(
     // celebrar, un paso animado
     const animado = actual === CELEBRA ? 1 : animacion(intensidad, intervalo);
     cambiarA(elegir(animado, 60_000 / intervalo), ahora);
-    // Canta a ratos: poco con música tranquila (~20 %), más con música animada (~65 %)
-    canta = Math.random() < 0.2 + animado * 0.45;
+    // Canta a ratos: poco con música tranquila (~20 %), más con música animada (~65 %), y más en
+    // el estribillo (la parte más intensa)
+    canta = Math.random() < 0.2 + animado * 0.45 + intensidad * 0.15;
     bloque = b;
     cambiarEnCompas = false;
   }
   const e = Math.max(0, Math.min(1, energia));
-  const amplitud = amplitudBaile();
+  // En el estribillo (parte intensa) se mueve más; en las estrofas, algo menos
+  const amplitud = amplitudBaile() * (0.85 + 0.3 * Math.max(0, Math.min(1, intensidad)));
   const m = actual.mover(pulso, e);
   const k = anterior ? Math.min(1, (ahora - cambio) / MEZCLA_MS) : 1;
   if (k >= 1 || !anterior) return { mov: ampliar(m, amplitud), ojos: actual.ojos, canta };

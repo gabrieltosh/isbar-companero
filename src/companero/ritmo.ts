@@ -55,6 +55,9 @@ export const ritmo = {
   pausa: false,
   /** Energía de graves, medios y agudos (0 a 1) */
   bandas: [0, 0, 0] as [number, number, number],
+  /** Cuánta voz hay ahora (0 a 1): los medios respecto a lo más fuerte que han sonado hace poco
+   * (la voz cantada está sobre todo en los medios) */
+  voz: 0,
   notas: [] as Nota[],
 };
 
@@ -101,6 +104,8 @@ function sacarNota(ahora: number, lado: number): void {
 
 /** El sonido más fuerte de hace poco: con él se ajusta la escala (ganancia automática). */
 let pico = 0;
+/** Lo mismo para los medios (la voz). */
+let picoMedios = 0;
 /** Por debajo de esto (sin ajustar) se considera silencio. */
 const SILENCIO = 0.004;
 
@@ -125,6 +130,10 @@ function procesar(e: EstadoAudio): void {
   const intensidad = Math.max(0, Math.min(1, (larga - minimo) / rango));
   ritmo.intensidad += (intensidad - ritmo.intensidad) * 0.03;
   ritmo.bandas = [e.graves, e.medios, e.agudos];
+  // Voz: sube enseguida y baja algo más despacio (para que la boca no tiemble)
+  picoMedios = Math.max(e.medios, picoMedios * 0.996);
+  const voz = e.medios < SILENCIO ? 0 : Math.min(1, e.medios / Math.max(picoMedios, 0.01));
+  ritmo.voz += (voz - ritmo.voz) * (voz > ritmo.voz ? 0.5 : 0.15);
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;

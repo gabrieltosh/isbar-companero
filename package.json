@@ -12,6 +12,7 @@
     "paquete:quitar": "powershell -ExecutionPolicy Bypass -File scripts/unregister-dev.ps1",
     "paquete:comprobar": "powershell -ExecutionPolicy Bypass -File scripts/check-identity.ps1",
     "claude:instalar": "node scripts/claude-statusline/instalar.mjs",
+    "jev:probar": "rolldown scripts/probar-jev.ts --platform node --format esm -o dist/probar-jev.mjs && node dist/probar-jev.mjs",
     "claude:quitar": "node scripts/claude-statusline/desinstalar.mjs",
     "paquete:store": "powershell -ExecutionPolicy Bypass -File scripts/paquete-store.ps1"
   },

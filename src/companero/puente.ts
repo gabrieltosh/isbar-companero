@@ -30,7 +30,7 @@ import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoP
 import { resumenClima } from "./clima";
 import { pausarGlobos } from "./globos";
 import { minutosNoMolestar } from "./noMolestar";
-import { caracterActual } from "./caracter";
+import { caracterActual, corregirCaracter } from "./caracter";
 import { resumenRitmo } from "./ritmo";
 import { responder, responderMusica } from "./respuestas";
 
@@ -95,6 +95,9 @@ function ejecutar(orden: OrdenPanel): void {
       break;
     case "musica-posicion":
       irAPosicion(orden.ms);
+      break;
+    case "caracter-corregir":
+      corregirCaracter(orden);
       break;
   }
   enviar();

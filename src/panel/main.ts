@@ -9,6 +9,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { $, escapar, mmss } from "../util";
 import { EVENTO_SISTEMA, duracionLegible, type EstadoSistema } from "../estado/sistema";
 import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoPanel, type OrdenPanel } from "./tipos";
+import type { Estilo } from "../estado/jev";
 
 interface Notificacion {
   id: number;
@@ -403,14 +404,27 @@ function pintarMusica(e: EstadoPanel): void {
   // Mientras se arrastra, la barra la mueve el ratón
   if (!buscando) pintarPosicion(m.duracionMs > 0 ? m.posicion / m.duracionMs : 0, m.posicion);
   fijarHtml($(document, ".mg-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
-  // Lo que dice Jev de la canción (ánimo y estilo de baile)
+  // Lo que dice Jev de la canción (tono, energía y estilo de baile; con «a mano» lo corregido).
+  // Pulsándolo se abre la corrección
   const c = e.caracter;
   const caracter = $(document, ".mg-caracter");
   caracter.hidden = !c;
+  if (!c) $(document, ".mg-corregir").hidden = true;
   if (c) {
     const coma = (n: number) => n.toFixed(1).replace(".", ",");
-    const estilo = c.estilo ? `baile ${NOMBRE_ESTILO[c.estilo] ?? c.estilo} (${Math.round(c.confianzaEstilo * 100)} %)` : "baile según el ritmo";
-    caracter.textContent = `Jev: ${nombreTono(c.tono)} (${coma(c.tono)}) · energía ${nombreEnergia(c.energia)} (${coma(c.energia)}) · ${estilo}`;
+    const mano = (k: "tono" | "energia" | "estilo") => (c.corregido[k] ? " · a mano" : "");
+    const tono = c.tono === null ? "tono sin saber" : `${nombreTono(c.tono)} (${coma(c.tono)}${mano("tono")})`;
+    const energia = c.energia === null ? "energía sin saber" : `energía ${nombreEnergia(c.energia)} (${coma(c.energia)}${mano("energia")})`;
+    // Con mezcla: «rockero 60 % + de balada 35 %»
+    const mezcla = c.estilos ? Object.entries(c.estilos).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)) : [];
+    const estilo =
+      mezcla.length > 1
+        ? `baile ${mezcla.map(([k, w]) => `${NOMBRE_ESTILO[k] ?? k} ${Math.round((w ?? 0) * 100)} %`).join(" + ")}`
+        : c.estilo
+          ? `baile ${NOMBRE_ESTILO[c.estilo] ?? c.estilo} (${c.corregido.estilo ? "a mano" : `${Math.round(c.confianzaEstilo * 100)} %`})`
+          : "baile según el ritmo";
+    caracter.textContent = `Jev: ${tono} · ${energia} · ${estilo}`;
+    caracterAhora = c;
   }
   const r = e.ritmo;
   const ritmo = $(document, ".mg-ritmo");
@@ -421,6 +435,34 @@ function pintarMusica(e: EstadoPanel): void {
     ritmo.textContent = `${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · ${parte} · paso: ${r.paso}`;
   }
 }
+
+// Corregir a Jev: pulsar su línea abre unos botones (más triste/alegre, más calmada/movida, otro
+// género). El compañero lo recuerda para esa canción
+let caracterAhora: EstadoPanel["caracter"] = null;
+const corregir = $(document, ".mg-corregir");
+$(document, ".mg-caracter").addEventListener("click", () => {
+  corregir.hidden = !corregir.hidden;
+});
+fijarHtml(
+  $(document, ".estilos-corregir"),
+  Object.entries(NOMBRE_ESTILO)
+    .map(([k, nombre]) => `<button class="boton" data-corregir="estilo" data-estilo="${k}">${nombre.replace(/^de /, "")}</button>`)
+    .join(""),
+);
+corregir.addEventListener("click", (ev) => {
+  const b = (ev.target as HTMLElement).closest<HTMLElement>("[data-corregir]");
+  if (!b) return;
+  const que = b.dataset.corregir;
+  if (que === "estilo") {
+    ordenar({ tipo: "caracter-corregir", estilo: b.dataset.estilo as Estilo });
+    return;
+  }
+  // Más o menos que lo que hay (si aún no se sabe, desde el medio)
+  const paso = Number(b.dataset.paso);
+  const actual = (que === "tono" ? caracterAhora?.tono : caracterAhora?.energia) ?? 2;
+  const valor = Math.max(0, Math.min(4, actual + paso));
+  ordenar(que === "tono" ? { tipo: "caracter-corregir", tono: valor } : { tipo: "caracter-corregir", energia: valor });
+});
 
 /** Barra de la canción (fracción de 0 a 1) y el tiempo de la izquierda. */
 function pintarPosicion(fraccion: number, ms: number): void {

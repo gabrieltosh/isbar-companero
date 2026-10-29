@@ -3,6 +3,7 @@
 import type { InfoMedia } from "../estado/musica";
 import type { TipoPausa } from "../estado/pausas";
 import type { Modo } from "../estado/pomodoro";
+import type { Estilo } from "../estado/jev";
 
 export interface EstadoPanel {
   pomodoro: {
@@ -23,8 +24,16 @@ export interface EstadoPanel {
     tipos: { tipo: TipoPausa; nombre: string; activa: boolean; cuando: string }[];
   };
   musica: (InfoMedia & { posicion: number }) | null;
-  /** Cómo es la canción según Jev: tono y energía (0 a 4) y estilo (null si no está seguro); null si no se sabe */
-  caracter: { tono: number; energia: number; estilo: string | null; confianzaEstilo: number } | null;
+  /** Cómo es la canción según Jev: tono y energía (0 a 4), estilo y mezcla de géneros (null si no
+   * está seguro) y qué se corrigió a mano; null si no se sabe */
+  caracter: {
+    tono: number | null;
+    energia: number | null;
+    estilo: string | null;
+    confianzaEstilo: number;
+    estilos: Partial<Record<string, number>> | null;
+    corregido: { tono?: boolean; energia?: boolean; estilo?: boolean };
+  } | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
   ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string } | null;
   /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
@@ -48,7 +57,9 @@ export type OrdenPanel =
   | { tipo: "pomodoro-modo"; modo: Modo }
   | { tipo: "pausa-empezar"; pausa: TipoPausa }
   | { tipo: "musica"; accion: "anterior" | "play" | "siguiente" }
-  | { tipo: "musica-posicion"; ms: number };
+  | { tipo: "musica-posicion"; ms: number }
+  /** Corregir a Jev para la canción que suena (se recuerda) */
+  | { tipo: "caracter-corregir"; tono?: number; energia?: number; estilo?: Estilo };
 
 /** El compañero manda la foto del estado (EstadoPanel). */
 export const EVENTO_ESTADO = "panel-estado";
