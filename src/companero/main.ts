@@ -186,6 +186,13 @@ function fotograma(ahora: number): void {
     // Mira hacia donde lo llevas
     miraX = Math.max(-4, Math.min(4, paseo.vx * 3));
     miraY = Math.max(-3.5, Math.min(3.5, paseo.vy * 3));
+  } else if (expresion === "curioso") {
+    // Examina su nuevo sitio: mira a un lado y a otro, inclinándose hacia donde mira
+    const tramo = MIRADAS_CURIOSEO[Math.min(MIRADAS_CURIOSEO.length - 1, Math.floor(progreso * MIRADAS_CURIOSEO.length))];
+    [miraX, miraY] = tramo;
+    inclinaX = miraX * 0.9;
+    inclinaY = miraY * 0.6;
+    giroCursor = miraX * 2.5;
   } else if (borde !== 0) {
     miraX = -borde * 3.5;
   } else if (libre && cerca > 0) {
@@ -241,6 +248,19 @@ function fotograma(ahora: number): void {
       break;
     case "pensativo":
       giro += 10;
+      break;
+    case "curioso":
+      // Ladea la cabeza, con un saltito al mirar a otro sitio
+      giro += 9;
+      salto = -Math.max(0, Math.sin(progreso * MIRADAS_CURIOSEO.length * Math.PI * 2)) * 1.2 * movimiento;
+      break;
+    case "frustrado":
+      // Se desinfla un poco
+      giro -= 5;
+      salto = 1.5;
+      break;
+    case "impresionado":
+      salto = -Math.abs(Math.sin(ahora / 110)) * 1.5 * movimiento;
       break;
     case "preocupado":
       giro += Math.sin(ahora / 30) * 1.5;
@@ -375,6 +395,11 @@ companero.addEventListener("pointerdown", (e) => {
     companero.classList.add("arrastrando");
     // Un saltito al cogerlo
     Object.assign(paseo, { desde: performance.now(), vx: 0, vy: 0, ultima: null, sacudidas: [], direccion: 0 });
+    // Si estaba curioseando, lo deja
+    if (expresionActual === "curioso") {
+      curioseo += 1;
+      gesto("normal", 0);
+    }
     escalaX = 0.88;
     escalaY = 1.14;
     // Rust mueve la ventana con el cursor hasta que se suelta el botón
@@ -418,6 +443,45 @@ window.addEventListener("pointerup", () => {
   }
 });
 
+// Tras moverlo a otro sitio, curiosea lo que hay alrededor y reacciona (cada vez distinto)
+const DURACION_CURIOSEO = 3000;
+/** Lo mínimo que hay que llevarlo para que curiosee al soltarlo (ms). */
+const MINIMO_PASEO_CURIOSEO = 350;
+const REACCIONES: [Expresion, number][] = [
+  ["impresionado", 2000],
+  ["sorpresa", 1600],
+  ["frustrado", 2200],
+  ["feliz", 1600],
+  ["pensativo", 2000],
+  ["risa", 1500],
+  ["triste", 1800],
+];
+/** Hacia dónde mira mientras curiosea (por tramos del gesto): abajo a un lado, al otro, al frente… */
+const MIRADAS_CURIOSEO: [number, number][] = [
+  [-3.8, 3],
+  [-3.8, 3.4],
+  [3.8, 3],
+  [3.8, 2.6],
+  [0, 4],
+  [2.5, -2.5],
+];
+let curioseo = 0;
+let ultimaReaccion = -1;
+
+function curiosear(): void {
+  const id = ++curioseo;
+  gesto("curioso", DURACION_CURIOSEO);
+  setTimeout(() => {
+    // Si lo volviste a coger (u otra cosa lo interrumpió), no reacciona
+    if (id !== curioseo || arrastrando || expresionActual !== "curioso") return;
+    let i = Math.floor(Math.random() * REACCIONES.length);
+    if (i === ultimaReaccion) i = (i + 1) % REACCIONES.length;
+    ultimaReaccion = i;
+    const [expresion, ms] = REACCIONES[i];
+    gesto(expresion, ms);
+  }, DURACION_CURIOSEO);
+}
+
 // Al soltarlo: rebota, recuerda dónde quedó y si está escondido en un borde
 listen<Soltado>("companero-soltado", ({ payload }) => {
   if (arrastrando) {
@@ -426,6 +490,8 @@ listen<Soltado>("companero-soltado", ({ payload }) => {
     // Si lo sacudiste mientras lo llevabas, queda mareado
     const ahora = performance.now();
     if (paseo.sacudidas.filter((s) => ahora - s < 1500).length >= SACUDIDAS_MAREO) gesto("mareado", 2400);
+    // Si no, tras un paseo, curiosea su nuevo sitio (no si está escondido en un borde)
+    else if (ahora - paseo.desde > MINIMO_PASEO_CURIOSEO && payload.borde === 0) curiosear();
   }
   pulsado = false;
   arrastrando = false;

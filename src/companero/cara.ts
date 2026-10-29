@@ -25,7 +25,10 @@ export type Expresion =
   | "celebra"
   | "saludo"
   | "musica"
-  | "notificacion";
+  | "notificacion"
+  | "curioso"
+  | "frustrado"
+  | "impresionado";
 
 /** Un ojo: ancho, altura de la curva de arriba y de abajo (negativa = sube: "^"), giro y posición. */
 export interface Ojo {
@@ -149,6 +152,15 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
       return iguales(ojo(11, 2.6, -2.6, 12), boca(22, 0, 13));
     case "sorpresa":
       return iguales(OJO_GRANDE, boca(10, -6, 7, 0, 0, 1));
+    case "curioso":
+      // Un ojo muy abierto y el otro entornado, como quien examina algo; boquita de lado
+      return { izq: OJO_GRANDE, der: ojo(9.6, 2, 4, 10, 0, 1), boca: boca(6, -2.4, 2.4, 0, 3, 3) };
+    case "frustrado":
+      // Párpados planos medio cerrados (-_-) y boca de "hmpf" torcida
+      return iguales(ojo(10.5, 0.3, 2.6, 0, 0, 2), boca(11, -1, 1.2, -9, 2, 3));
+    case "impresionado":
+      // Ojos enormes y boca abierta de asombro
+      return iguales(ojo(12.4, 6.4, 6.4), boca(9, -5, 6.5, 0, 0, 1));
     case "notificacion":
       return iguales(OJO_GRANDE, boca(7.2, -4.4, 4.4, 0, 0, 1));
     case "enojado":
@@ -276,8 +288,9 @@ function espiral(x: number, y: number, giro: number, c: string): string {
   return `<path d="${d}" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
 }
 
-const estrella = (x: number, y: number, s: number, c: string) =>
-  `<path d="M${n(x)} ${n(y - 6 * s)} Q${n(x + 1.2 * s)} ${n(y - 1.2 * s)} ${n(x + 6 * s)} ${n(y)} Q${n(x + 1.2 * s)} ${n(y + 1.2 * s)} ${n(x)} ${n(y + 6 * s)} Q${n(x - 1.2 * s)} ${n(y + 1.2 * s)} ${n(x - 6 * s)} ${n(y)} Q${n(x - 1.2 * s)} ${n(y - 1.2 * s)} ${n(x)} ${n(y - 6 * s)} Z" ${conBorde(c)}/>`;
+const estrellaD = (x: number, y: number, s: number) =>
+  `M${n(x)} ${n(y - 6 * s)} Q${n(x + 1.2 * s)} ${n(y - 1.2 * s)} ${n(x + 6 * s)} ${n(y)} Q${n(x + 1.2 * s)} ${n(y + 1.2 * s)} ${n(x)} ${n(y + 6 * s)} Q${n(x - 1.2 * s)} ${n(y + 1.2 * s)} ${n(x - 6 * s)} ${n(y)} Q${n(x - 1.2 * s)} ${n(y - 1.2 * s)} ${n(x)} ${n(y - 6 * s)} Z`;
+const estrella = (x: number, y: number, s: number, c: string) => `<path d="${estrellaD(x, y, s)}" ${conBorde(c)}/>`;
 
 /** Notita musical que sube y se desvanece (k de 0 a 1). El palo lleva una línea oscura debajo como borde. */
 const nota = (x: number, y: number, k: number, c: string) =>
@@ -317,6 +330,35 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     }
     case "pensativo":
       return `<circle cx="62" cy="10" r="2.2" ${conBorde(c)}/><circle cx="69" cy="3" r="3.2" ${conBorde(c)}/>`;
+    case "curioso": {
+      // Un interrogante que aparece con un saltito y se balancea
+      const s = Math.min(1, progreso / 0.12);
+      const a = Math.sin(t / 260) * 10;
+      const q = "M-2.6 -3.4a2.8 2.8 0 1 1 3.8 2.6c-1 .5-1.2 1-1.2 2.2";
+      return (
+        `<g transform="translate(60 9) rotate(${n(a)}) scale(${n(s)})">` +
+        `<path d="${q}" stroke="${BORDE}" stroke-width="${n(2.4 + GROSOR_BORDE * 2)}" stroke-linecap="round" fill="none"/>` +
+        `<path d="${q}" stroke="${c}" stroke-width="2.4" stroke-linecap="round" fill="none"/>` +
+        `<circle cx="0" cy="5" r="1.4" ${conBorde(c)}/></g>`
+      );
+    }
+    case "frustrado": {
+      // Resopla: nubecitas que salen por arriba y se desvanecen
+      let r = "";
+      for (let i = 0; i < 2; i++) {
+        const k = ((t + i * 450) % 900) / 900;
+        r += `<circle cx="${n(54 + k * 6 + i * 4)}" cy="${n(10 - k * 8)}" r="${n(1.6 + k * 2)}" ${conBorde(c)} opacity="${n(1 - k)}"/>`;
+      }
+      return r;
+    }
+    case "impresionado":
+    {
+      // Brillos dentro de los ojos y destellos a los lados
+      const brillo = (o: { x: number; y: number }) =>
+        `<path d="${estrellaD(o.x + p.miraX + 1.6, o.y + p.miraY + p.salto - 1.6, 0.42 + Math.sin(t / 140) * 0.08)}" fill="${BORDE}"/>`;
+      const g = `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">${brillo(OJO_IZQ)}${brillo(OJO_DER)}</g>`;
+      return g + estrella(2, 10, 0.6 + Math.sin(t / 120) * 0.2, c) + estrella(62, 6, 0.6 + Math.cos(t / 120) * 0.2, c);
+    }
     case "musica":
       if (p.musica) {
         // Notitas que salen con los golpes de la canción, de un lado o del otro
