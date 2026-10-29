@@ -18,6 +18,8 @@ mod media;
 mod notifications;
 #[cfg(any(target_os = "windows", test))]
 mod ritmo;
+#[cfg(target_os = "windows")]
+mod sistema;
 
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -57,6 +59,9 @@ pub fn run() {
         media::media_previous,
         media::media_seek,
         audio::escuchar_audio,
+        sistema::estado_sistema,
+        sistema::fijar_volumen,
+        sistema::alternar_silencio,
         notifications::abrir_ajustes_notificaciones,
         notifications::abrir_ajustes_banners,
         notifications::contar_notificaciones,
@@ -97,6 +102,7 @@ pub fn run() {
                 fullscreen::iniciar(app.handle().clone());
                 media::iniciar(app.handle().clone());
                 audio::iniciar(app.handle().clone());
+                sistema::iniciar(app.handle().clone());
                 notifications::iniciar(app.handle().clone());
             }
             Ok(())

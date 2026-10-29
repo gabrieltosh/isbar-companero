@@ -1,9 +1,11 @@
 // Panel del compañero: Inicio (Pomodoro, agua, pausas, música), Avisos (notificaciones de
-// Windows) y Música. El estado lo tiene el compañero: aquí se pinta su "foto" y se le mandan
-// órdenes. Las notificaciones sí se piden directamente a Rust.
+// Windows), Música y Sistema (batería, volumen, conexión y uso del PC). El estado lo tiene el
+// compañero: aquí se pinta su "foto" y se le mandan órdenes. Las notificaciones y el estado
+// del sistema sí se piden directamente a Rust.
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { $, escapar, mmss } from "../util";
+import { EVENTO_SISTEMA, duracionLegible, type EstadoSistema } from "../estado/sistema";
 import { EVENTO_ESTADO, EVENTO_ORDEN, EVENTO_PEDIR, EVENTO_VISIBLE, type EstadoPanel, type OrdenPanel } from "./tipos";
 
 interface Notificacion {
@@ -26,6 +28,8 @@ const ICONO = {
   gota: svg("M12 3.2c3.3 4 6 7.2 6 10.6a6 6 0 0 1-12 0c0-3.4 2.7-6.6 6-10.6z", true),
   ajustes: svg("M4 8h10M18 8h2M4 16h2M10 16h10M16 6v4M8 14v4"),
   cerrar: svg("M7 7l10 10M17 7 7 17"),
+  volumen: svg("M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"),
+  silencio: svg("M4 9.5h3.5L12 6v12l-4.5-3.5H4zM16 9.5l5 5M21 9.5l-5 5"),
 };
 
 const NOMBRE_MODO = { enfoque: "Enfoque", corto: "Descanso corto", largo: "Descanso largo" } as const;
@@ -253,6 +257,100 @@ $(document, "#borrar-todo").addEventListener("click", async () => {
   await invoke("eliminar_notificaciones").catch(console.error);
 });
 
+// ---------- Sistema ----------
+
+let sistema: EstadoSistema | null = null;
+/** Mientras se arrastra el volumen, la barra la mueve el ratón (no el estado que llega). */
+let moviendoVolumen = false;
+
+const decimal = (n: number) => n.toLocaleString("es", { maximumFractionDigits: 1 });
+/** Color de una barra de uso: verde, amarillo o rojo según lo llena que esté. */
+const colorUso = (pct: number) => (pct >= 85 ? "var(--rojo)" : pct >= 60 ? "#ffd60a" : "var(--verde)");
+
+function pintarSistema(): void {
+  const s = sistema;
+  const b = s?.bateria;
+  $(document, "#s-bateria").hidden = !b;
+  if (b) {
+    $(document, ".s-b-porcentaje").textContent = `${b.porcentaje} %`;
+    const barra = $(document, ".s-b-barra");
+    barra.style.width = `${b.porcentaje}%`;
+    barra.style.background = b.porcentaje <= 20 && !b.enchufado ? "var(--rojo)" : "var(--verde)";
+    $(document, ".s-b-ahorro").hidden = !b.ahorro;
+    const w = b.vatios ? `${decimal(b.vatios)} W` : "";
+    let detalle: string;
+    if (b.cargando) {
+      detalle = ["Cargando", b.minutosParaLlenar !== null ? `llena en ${duracionLegible(b.minutosParaLlenar)}` : "", w].filter(Boolean).join(" · ");
+    } else if (b.enchufado) {
+      detalle = b.porcentaje >= 99 ? "Enchufada · carga completa" : "Enchufada";
+    } else {
+      const queda = b.minutosRestantes !== null ? `Quedan ${duracionLegible(b.minutosRestantes)}` : "Con batería";
+      detalle = [queda, w ? `gastando ${w}` : ""].filter(Boolean).join(" · ");
+    }
+    $(document, ".s-b-detalle").textContent = detalle;
+  }
+
+  const v = s?.volumen;
+  $(document, "#s-volumen").hidden = !v;
+  if (v) {
+    $(document, ".s-v-dispositivo").textContent = v.dispositivo || "Volumen";
+    const silencio = $(document, ".s-v-silencio");
+    fijarHtml(silencio, v.silencio ? ICONO.silencio : ICONO.volumen);
+    silencio.title = v.silencio ? "Quitar el silencio" : "Silenciar";
+    if (!moviendoVolumen) {
+      $<HTMLInputElement>(document, ".s-v-nivel").value = String(v.nivel);
+      $(document, ".s-v-valor").textContent = v.silencio ? "Mudo" : `${v.nivel} %`;
+    }
+  }
+
+  const c = s?.conexion;
+  $(document, "#s-conexion").hidden = !c;
+  if (c) {
+    const punto = $(document, ".s-c-estado .punto");
+    punto.className = `punto${!c.conectado ? " mal" : !c.internet ? " regular" : ""}`;
+    const red = c.nombre ? `${c.wifi ? "Wifi" : "Red"} · ${c.nombre}` : c.wifi ? "Wifi" : "Por cable";
+    $(document, ".s-c-texto").textContent = !c.conectado ? "Sin conexión" : !c.internet ? `${red} · sin internet` : red;
+  }
+
+  const u = s?.uso;
+  $(document, "#s-cpu").hidden = !u;
+  $(document, "#s-memoria").hidden = !u;
+  if (u) {
+    $(document, ".s-u-cpu").textContent = `${u.cpu} %`;
+    const cpu = $(document, ".s-u-cpu-barra");
+    cpu.style.width = `${u.cpu}%`;
+    cpu.style.background = colorUso(u.cpu);
+    $(document, ".s-u-memoria").textContent = `${u.memoria} %`;
+    const memoria = $(document, ".s-u-memoria-barra");
+    memoria.style.width = `${u.memoria}%`;
+    memoria.style.background = colorUso(u.memoria);
+    $(document, ".s-u-memoria-gb").textContent = `${decimal(u.memoriaUsada)} de ${decimal(u.memoriaTotal)} GB`;
+  }
+}
+
+const nivelVolumen = $<HTMLInputElement>(document, ".s-v-nivel");
+nivelVolumen.addEventListener("input", () => {
+  moviendoVolumen = true;
+  $(document, ".s-v-valor").textContent = `${nivelVolumen.value} %`;
+  invoke("fijar_volumen", { nivel: Number(nivelVolumen.value) }).catch(console.error);
+});
+nivelVolumen.addEventListener("change", () => {
+  moviendoVolumen = false;
+});
+$(document, ".s-v-silencio").addEventListener("click", () => {
+  invoke("alternar_silencio").catch(console.error);
+});
+
+async function cargarSistema(): Promise<void> {
+  sistema = await invoke<EstadoSistema | null>("estado_sistema").catch(() => null);
+  pintarSistema();
+}
+
+listen<EstadoSistema>(EVENTO_SISTEMA, ({ payload }) => {
+  sistema = payload;
+  pintarSistema();
+}).catch(console.error);
+
 // ---------- Estado y arranque ----------
 
 listen<EstadoPanel>(EVENTO_ESTADO, ({ payload }) => {
@@ -266,6 +364,7 @@ listen<boolean>(EVENTO_VISIBLE, ({ payload }) => {
   pintarCabecera();
   void emit(EVENTO_PEDIR);
   void cargarAvisos();
+  void cargarSistema();
   // La animación de entrada vuelve a empezar cada vez que se abre
   const panel = $(document, ".panel");
   panel.style.animation = "none";
@@ -282,4 +381,5 @@ window.addEventListener("keydown", (e) => {
 pintarCabecera();
 void emit(EVENTO_PEDIR);
 void cargarAvisos();
+void cargarSistema();
 if (estado) pintarInicio(estado);

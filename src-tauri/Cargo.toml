@@ -63,6 +63,12 @@ windows = { version = "0.62", features = [
   "Win32_Graphics_Dwm",
   # Evento que pide la escucha de solo la app de música (CreateEventW)
   "Win32_Security",
+  # Estado del sistema (sistema.rs): batería, nombre del dispositivo de salida y conexión
+  "Devices_Power",
+  "Win32_System_Power",
+  "Win32_Devices_FunctionDiscovery",
+  "Win32_UI_Shell_PropertiesSystem",
+  "Networking_Connectivity",
 ] }
 # Para escribir el aviso de "escucha preparada" de Windows (macro #[implement]); ya la usa `windows`
 windows-core = "0.62"

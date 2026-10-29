@@ -134,6 +134,11 @@ svg {
 
 /* ---------- Inicio ---------- */
 
+/* Las tarjetas que no tocan (p. ej. la batería en un PC de sobremesa) no se ven */
+.tarjeta[hidden] {
+  display: none;
+}
+
 .tarjetas {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -465,4 +470,47 @@ svg {
 }
 .busqueda.arrastrando i {
   transition: none;
+}
+
+/* ---------- Sistema ---------- */
+
+.volumen {
+  align-items: center;
+  gap: 10px;
+}
+.volumen input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--principal);
+}
+.s-v-valor {
+  min-width: 38px;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.s-v-dispositivo {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.s-c-estado {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.punto {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verde);
+}
+.punto.mal {
+  background: var(--rojo);
+}
+.punto.regular {
+  background: #ffd60a;
 }

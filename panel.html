@@ -22,6 +22,7 @@
         <button role="tab" data-vista="inicio" class="activa">Inicio</button>
         <button role="tab" data-vista="avisos">Avisos <span class="insignia" id="insignia" hidden></span></button>
         <button role="tab" data-vista="musica">Música</button>
+        <button role="tab" data-vista="sistema">Sistema</button>
       </nav>
 
       <section class="vista activa" data-vista="inicio">
@@ -91,6 +92,44 @@
           <small class="mg-ritmo" hidden></small>
         </div>
         <p class="vacio" id="sin-musica">No suena nada ahora mismo.</p>
+      </section>
+
+      <section class="vista" data-vista="sistema">
+        <div class="tarjetas">
+          <article class="tarjeta ancha" id="s-bateria" hidden>
+            <small>Batería<span class="s-b-ahorro" hidden> · ahorro activado</span></small>
+            <b class="grande s-b-porcentaje"></b>
+            <div class="barra"><i class="s-b-barra"></i></div>
+            <small class="s-b-detalle"></small>
+          </article>
+
+          <article class="tarjeta ancha" id="s-volumen" hidden>
+            <small class="s-v-dispositivo"></small>
+            <div class="fila volumen">
+              <button class="boton icono-boton s-v-silencio" aria-label="Silenciar o quitar el silencio"></button>
+              <input type="range" min="0" max="100" step="1" class="s-v-nivel" aria-label="Volumen" />
+              <b class="s-v-valor"></b>
+            </div>
+          </article>
+
+          <article class="tarjeta ancha" id="s-conexion" hidden>
+            <small>Conexión</small>
+            <b class="s-c-estado"><i class="punto"></i><span class="s-c-texto"></span></b>
+          </article>
+
+          <article class="tarjeta" id="s-cpu" hidden>
+            <small>Procesador</small>
+            <b class="grande s-u-cpu"></b>
+            <div class="barra"><i class="s-u-cpu-barra"></i></div>
+          </article>
+
+          <article class="tarjeta" id="s-memoria" hidden>
+            <small>Memoria</small>
+            <b class="grande s-u-memoria"></b>
+            <div class="barra"><i class="s-u-memoria-barra"></i></div>
+            <small class="s-u-memoria-gb"></small>
+          </article>
+        </div>
       </section>
     </main>
   </body>

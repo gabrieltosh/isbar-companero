@@ -103,7 +103,7 @@ struct Captura {
     frecuencia: u32,
 }
 
-fn por_defecto() -> windows::core::Result<IMMDevice> {
+pub(crate) fn por_defecto() -> windows::core::Result<IMMDevice> {
     // SAFETY: llamadas COM en un hilo con COM iniciado.
     unsafe {
         let enumerador: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
@@ -114,7 +114,7 @@ fn por_defecto() -> windows::core::Result<IMMDevice> {
 /// Copia una cadena reservada por COM y la libera.
 ///
 /// SAFETY: `texto` debe venir de COM (CoTaskMemAlloc) y no usarse después.
-unsafe fn cadena_com(texto: windows::core::PWSTR) -> String {
+pub(crate) unsafe fn cadena_com(texto: windows::core::PWSTR) -> String {
     // SAFETY: lo garantiza quien llama.
     unsafe {
         let copia = texto.to_string().unwrap_or_default();
@@ -124,7 +124,7 @@ unsafe fn cadena_com(texto: windows::core::PWSTR) -> String {
 }
 
 /// Identificador del dispositivo, para saber si ha cambiado.
-fn id_de(dispositivo: &IMMDevice) -> windows::core::Result<String> {
+pub(crate) fn id_de(dispositivo: &IMMDevice) -> windows::core::Result<String> {
     // SAFETY: interfaz COM válida; la cadena se copia y se libera.
     unsafe { Ok(cadena_com(dispositivo.GetId()?)) }
 }
