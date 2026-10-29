@@ -298,7 +298,10 @@ pub(crate) fn leer_imagen(
 
 /// Ejecuta una acción sobre la sesión actual en un hilo bloqueante,
 /// para no frenar el hilo principal de Tauri.
-async fn sobre_sesion(accion: fn(&Sesion) -> WinResult<IAsyncOperation<bool>>) -> Result<(), String> {
+/// Devuelve si el reproductor aceptó la orden.
+async fn sobre_sesion(
+    accion: impl FnOnce(&Sesion) -> WinResult<IAsyncOperation<bool>> + Send + 'static,
+) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || -> WinResult<bool> {
         iniciar_winrt();
         let sesion = Gestor::RequestAsync()?.join()?.GetCurrentSession()?;
@@ -307,20 +310,28 @@ async fn sobre_sesion(accion: fn(&Sesion) -> WinResult<IAsyncOperation<bool>>) -
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| format!("No hay ninguna sesión multimedia activa ({e})"))
-    .map(|_| ())
 }
 
 #[tauri::command]
 pub async fn media_play_pause() -> Result<(), String> {
-    sobre_sesion(|s| s.TryTogglePlayPauseAsync()).await
+    sobre_sesion(|s| s.TryTogglePlayPauseAsync()).await.map(|_| ())
 }
 
 #[tauri::command]
 pub async fn media_next() -> Result<(), String> {
-    sobre_sesion(|s| s.TrySkipNextAsync()).await
+    sobre_sesion(|s| s.TrySkipNextAsync()).await.map(|_| ())
 }
 
 #[tauri::command]
 pub async fn media_previous() -> Result<(), String> {
-    sobre_sesion(|s| s.TrySkipPreviousAsync()).await
+    sobre_sesion(|s| s.TrySkipPreviousAsync()).await.map(|_| ())
+}
+
+/// Salta a una posición de la canción (en ms). Devuelve si el reproductor lo permite
+/// (no todos aceptan que se cambie la posición desde fuera).
+#[tauri::command]
+pub async fn media_seek(posicion_ms: u64) -> Result<bool, String> {
+    // WinRT mide el tiempo en unidades de 100 ns
+    let ticks = i64::try_from(posicion_ms).unwrap_or(i64::MAX / 10_000).saturating_mul(10_000);
+    sobre_sesion(move |s| s.TryChangePlaybackPositionAsync(ticks)).await
 }

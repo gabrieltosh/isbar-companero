@@ -138,11 +138,50 @@ function pintarMusica(e: EstadoPanel): void {
   caratula.style.visibility = m.caratula ? "visible" : "hidden";
   $(document, ".mg-titulo").textContent = m.titulo || "Sin título";
   $(document, ".mg-artista").textContent = m.artista;
-  $(document, ".mg-pos").textContent = mmss(m.posicion);
   $(document, ".mg-dur").textContent = mmss(m.duracionMs);
-  $(document, ".mg-barra").style.width = m.duracionMs > 0 ? `${Math.min(100, (m.posicion / m.duracionMs) * 100)}%` : "0%";
+  // Mientras se arrastra, la barra la mueve el ratón
+  if (!buscando) pintarPosicion(m.duracionMs > 0 ? m.posicion / m.duracionMs : 0, m.posicion);
   fijarHtml($(document, ".mg-play"), m.reproduciendo ? ICONO.pausa : ICONO.play);
 }
+
+/** Barra de la canción (fracción de 0 a 1) y el tiempo de la izquierda. */
+function pintarPosicion(fraccion: number, ms: number): void {
+  const pct = `${Math.min(100, Math.max(0, fraccion * 100))}%`;
+  $(document, ".mg-barra").style.width = pct;
+  $(document, "#busqueda .pomo").style.left = pct;
+  $(document, ".mg-pos").textContent = mmss(ms);
+}
+
+// Pulsar o arrastrar la barra para ir a otro momento de la canción
+const busqueda = $(document, "#busqueda");
+let buscando = false;
+
+function fraccionEn(x: number): number {
+  const r = busqueda.getBoundingClientRect();
+  return Math.min(1, Math.max(0, (x - r.left) / r.width));
+}
+
+busqueda.addEventListener("pointerdown", (e) => {
+  const dur = estado?.musica?.duracionMs ?? 0;
+  if (dur <= 0) return;
+  buscando = true;
+  busqueda.classList.add("arrastrando");
+  busqueda.setPointerCapture(e.pointerId);
+  const f = fraccionEn(e.clientX);
+  pintarPosicion(f, f * dur);
+});
+busqueda.addEventListener("pointermove", (e) => {
+  if (!buscando) return;
+  const f = fraccionEn(e.clientX);
+  pintarPosicion(f, f * (estado?.musica?.duracionMs ?? 0));
+});
+busqueda.addEventListener("pointerup", (e) => {
+  if (!buscando) return;
+  buscando = false;
+  busqueda.classList.remove("arrastrando");
+  const dur = estado?.musica?.duracionMs ?? 0;
+  ordenar({ tipo: "musica-posicion", ms: Math.round(fraccionEn(e.clientX) * dur) });
+});
 
 // ---------- Avisos ----------
 

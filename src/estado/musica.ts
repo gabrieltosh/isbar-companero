@@ -52,6 +52,23 @@ export const reproducirPausar = (): void => comando("media_play_pause");
 export const cancionSiguiente = (): void => comando("media_next");
 export const cancionAnterior = (): void => comando("media_previous");
 
+/** Salta a una posición (ms). Se ve al momento; si el reproductor no lo permite, vuelve donde estaba. */
+export function irAPosicion(ms: number): void {
+  if (!info) return;
+  const antes = { base: posicionBase, marca: marcaBase };
+  posicionBase = Math.max(0, info.duracionMs > 0 ? Math.min(ms, info.duracionMs) : ms);
+  marcaBase = performance.now();
+  cambiosMusica.emitir();
+  invoke<boolean>("media_seek", { posicionMs: Math.round(posicionBase) })
+    .then((aceptado) => {
+      if (aceptado) return;
+      posicionBase = antes.base;
+      marcaBase = antes.marca;
+      cambiosMusica.emitir();
+    })
+    .catch((e) => console.warn("media_seek no disponible:", e));
+}
+
 /** Empieza a escuchar a Rust. Se puede llamar varias veces. */
 export function iniciarMusica(): void {
   if (iniciado) return;

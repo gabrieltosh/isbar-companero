@@ -2,7 +2,14 @@
 // manda al panel mientras está abierto; el panel le devuelve órdenes.
 import { emit, listen } from "@tauri-apps/api/event";
 import { beber, configAgua, mlHoy } from "../estado/agua";
-import { cancionAnterior, cancionSiguiente, infoMusica, posicionMusica, reproducirPausar } from "../estado/musica";
+import {
+  cancionAnterior,
+  cancionSiguiente,
+  infoMusica,
+  irAPosicion,
+  posicionMusica,
+  reproducirPausar,
+} from "../estado/musica";
 import {
   NOMBRE_PAUSA,
   TIPOS_PAUSA,
@@ -73,6 +80,9 @@ function ejecutar(orden: OrdenPanel): void {
       if (orden.accion === "anterior") cancionAnterior();
       if (orden.accion === "play") reproducirPausar();
       if (orden.accion === "siguiente") cancionSiguiente();
+      break;
+    case "musica-posicion":
+      irAPosicion(orden.ms);
       break;
   }
   enviar();

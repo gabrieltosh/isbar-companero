@@ -426,3 +426,37 @@ svg {
   background: var(--principal);
   color: #111;
 }
+
+/* Barra de la canción: se pulsa o se arrastra para ir a otro momento */
+.busqueda {
+  position: relative;
+  overflow: visible;
+  cursor: pointer;
+  touch-action: none;
+}
+/* Zona de clic más alta que la barra */
+.busqueda::before {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
+.busqueda .pomo {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--texto);
+  transform: scale(0);
+  transition: transform 120ms;
+  pointer-events: none;
+}
+.busqueda:hover .pomo,
+.busqueda.arrastrando .pomo {
+  transform: scale(1);
+}
+.busqueda.arrastrando i {
+  transition: none;
+}

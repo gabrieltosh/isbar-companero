@@ -30,7 +30,8 @@ export type OrdenPanel =
   | { tipo: "pomodoro-modo"; modo: Modo }
   | { tipo: "agua-beber" }
   | { tipo: "pausa-empezar"; pausa: TipoPausa }
-  | { tipo: "musica"; accion: "anterior" | "play" | "siguiente" };
+  | { tipo: "musica"; accion: "anterior" | "play" | "siguiente" }
+  | { tipo: "musica-posicion"; ms: number };
 
 /** El compañero manda la foto del estado (EstadoPanel). */
 export const EVENTO_ESTADO = "panel-estado";

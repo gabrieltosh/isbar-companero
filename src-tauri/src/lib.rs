@@ -49,6 +49,7 @@ pub fn run() {
         media::media_play_pause,
         media::media_next,
         media::media_previous,
+        media::media_seek,
         notifications::abrir_ajustes_notificaciones,
         notifications::abrir_ajustes_banners,
         notifications::contar_notificaciones,
