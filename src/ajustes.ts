@@ -70,6 +70,17 @@ export interface ConfigGlobos {
 
 export const GLOBOS_POR_DEFECTO: ConfigGlobos = { cancion: true };
 
+/** Jev (TypeSafe): decisiones con un modelo en la nube. Apagado por defecto. */
+export interface ConfigJev {
+  activo: boolean;
+  /** Clave de API del usuario (se queda en este PC, en el store) */
+  clave: string;
+  /** Decide si cada notificación es urgente, normal o ruido (envía la app, el título y el texto) */
+  notificaciones: boolean;
+}
+
+export const JEV_POR_DEFECTO: ConfigJev = { activo: false, clave: "", notificaciones: true };
+
 /** Sonido común de los avisos (pausas activas y recordatorio de agua). */
 export interface ConfigSonido {
   activo: boolean;

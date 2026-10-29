@@ -2,6 +2,19 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "companero",
   "description": "Permisos de la ventana del compañero",
-  "windows": ["companero"],
-  "permissions": ["core:default", "store:default"]
+  "windows": [
+    "companero"
+  ],
+  "permissions": [
+    "core:default",
+    "store:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://api.typesafe.ai/*"
+        }
+      ]
+    }
+  ]
 }

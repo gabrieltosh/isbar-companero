@@ -27,6 +27,7 @@ tauri-plugin-store = "2"
 tauri-plugin-autostart = "2"
 # Solo una copia a la vez: si se vuelve a abrir, avisa a la que ya está en marcha
 tauri-plugin-single-instance = "2"
+tauri-plugin-http = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

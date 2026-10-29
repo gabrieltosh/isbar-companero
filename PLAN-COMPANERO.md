@@ -31,7 +31,8 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
    dato clave que llevan a su pestaña; Recursos (CPU, memoria, batería) y Tiempo (ahora, hoy,
    lluvia) pasan como carrusel cada 4 s. El agua ya no está en el panel (globo y bandeja).
 5. **Fase 5 (asistente)**: Tareas/recordatorios y Chat.
-6. **Modo inteligente con Jev** (opcional, cuando haya acceso): ver «Hacerlo más inteligente».
+6. **Modo inteligente con Jev** (en curso): conexión y filtro de notificaciones hechos; ver
+   «Hacerlo más inteligente».
 
 | Fase | Estado |
 |---|---|
@@ -382,12 +383,25 @@ Hoy las reacciones salen de reglas fijas. Jev decidiría lo que con reglas queda
 - Llamarlo desde Rust (posible dependencia nueva para HTTP, a explicar antes) o desde el frontend.
 - Comparar sus decisiones con las reglas antes de darle el control.
 
+### Cómo es la API (leída en docs.typesafe.ai)
+- `POST https://api.typesafe.ai/v1/systemone`, cabecera `Authorization: Bearer <clave>`, cuerpo
+  `{ model: "jev-latest", state, questions }`. Preguntas: `choice` (opciones con descripción),
+  `score` (escala) y `noul` (sí/no). Respuesta: `answers` con la opción, sus probabilidades y la
+  confianza. 0,042 $ por millón de tokens de entrada (la salida no se cobra); 64k de contexto.
+- La API no admite llamadas desde el navegador (CORS): se llama con `tauri-plugin-http`, con
+  permiso solo para `https://api.typesafe.ai/*` (`src/estado/jev.ts`).
+
 ### Pasos
-1. Pedir acceso en typesafe.ai y conseguir una clave (lo hace el usuario).
-2. Leer la documentación de la API: formato de las consultas, límites y si admite español.
-3. Conexión con Jev y ajuste en Configuración (clave y aviso de privacidad).
-4. Experimento «qué hacer ahora».
-5. Experimento «carácter del baile».
+1. ~~Conseguir una clave~~ ✅ (el usuario).
+2. ~~Leer la documentación~~ ✅ (arriba). Si entiende español lo dice «Probar» en Configuración.
+3. ~~Conexión y ajuste en Configuración~~ ✅: «Inteligencia (Jev)» con interruptor, clave, botón
+   Probar (comprueba también el español) y aviso de qué sale del PC.
+4. ~~Filtrar notificaciones~~ ✅: urgente (pasa delante y espera hasta que respondas), normal o
+   ruido (no sale en globo). Con poca confianza, error o sin respuesta en 4 s, es normal. Cada
+   decisión queda en la consola para compararla.
+5. Saber qué estás haciendo (reunión, código, vídeo…) para ajustar cuánto habla.
+6. Experimento «qué hacer ahora».
+7. Experimento «carácter del baile».
 
 ## Para más adelante
 - IA opcional para conversar (clave de API propia del usuario; se avisa de que el texto sale del PC).

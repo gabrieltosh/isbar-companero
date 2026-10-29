@@ -36,6 +36,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        // Peticiones a la API de Jev (desde la página no se puede: la API no lo permite al navegador)
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .manage(window::Estado::default());
 

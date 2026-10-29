@@ -5,6 +5,7 @@ import {
   AGUA_POR_DEFECTO,
   CLIMA_POR_DEFECTO,
   GLOBOS_POR_DEFECTO,
+  JEV_POR_DEFECTO,
   COLORES_COMPANERO,
   COMPANERO_POR_DEFECTO,
   ESCENAS_PRUEBA,
@@ -19,11 +20,13 @@ import {
   type ConfigClima,
   type ConfigCompanero,
   type ConfigGlobos,
+  type ConfigJev,
   type ConfigPausas,
   type ConfigPomodoro,
   type ConfigSonido,
 } from "./ajustes";
 import { buscarCiudad, type Lugar } from "./estado/clima";
+import { preguntarJev } from "./estado/jev";
 import { campanita } from "./sonido";
 import { guardar, leer } from "./store";
 import { $, escapar } from "./util";
@@ -37,6 +40,7 @@ const grupos: {
   companero: ConfigCompanero;
   clima: ConfigClima;
   globos: ConfigGlobos;
+  jev: ConfigJev;
 } = {
   pomodoro: await leer("pomodoroConfig", POMODORO_POR_DEFECTO),
   agua: await leer("aguaConfig", AGUA_POR_DEFECTO),
@@ -45,6 +49,7 @@ const grupos: {
   companero: { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) },
   clima: { ...CLIMA_POR_DEFECTO, ...(await leer<Partial<ConfigClima>>("climaConfig", {})) },
   globos: { ...GLOBOS_POR_DEFECTO, ...(await leer<Partial<ConfigGlobos>>("globosConfig", {})) },
+  jev: { ...JEV_POR_DEFECTO, ...(await leer<Partial<ConfigJev>>("jevConfig", {})) },
 };
 const CLAVES: Record<keyof typeof grupos, string> = {
   pomodoro: "pomodoroConfig",
@@ -54,6 +59,7 @@ const CLAVES: Record<keyof typeof grupos, string> = {
   companero: "companeroConfig",
   clima: "climaConfig",
   globos: "globosConfig",
+  jev: "jevConfig",
 };
 
 async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
@@ -189,6 +195,46 @@ $(document, "#clima-probar").addEventListener("click", () => {
 });
 $(document, "#clima-parar").addEventListener("click", () => {
   emit(EVENTO_PROBAR_ESCENA, PARAR_PRUEBA).catch(console.error);
+});
+
+// ---------- Jev ----------
+
+const jevClave = $<HTMLInputElement>(document, "#jev-clave");
+const jevEstado = $(document, "#jev-estado");
+const jevProbar = $<HTMLButtonElement>(document, "#jev-probar");
+jevClave.value = grupos.jev.clave;
+jevEstado.textContent = grupos.jev.clave ? "Sin probar" : "Sin clave";
+jevClave.addEventListener("change", () => {
+  grupos.jev.clave = jevClave.value.trim();
+  jevEstado.textContent = grupos.jev.clave ? "Sin probar" : "Sin clave";
+  void guardarGrupo("jev");
+});
+
+/** Prueba la clave con una pregunta en español: así se ve también si entiende el idioma. */
+jevProbar.addEventListener("click", async () => {
+  if (!grupos.jev.clave) {
+    jevEstado.textContent = "Pega primero la clave";
+    return;
+  }
+  jevProbar.disabled = true;
+  jevEstado.textContent = "Probando…";
+  try {
+    const { modelo, respuestas } = await preguntarJev(
+      grupos.jev.clave,
+      { mensaje: "¡Mañana hace sol y calor! Perfecto para ir a la playa." },
+      {
+        bueno: { type: "noul", instructions: "El mensaje dice que mañana hará buen tiempo" },
+        lluvia: { type: "noul", instructions: "El mensaje dice que mañana va a llover" },
+      },
+    );
+    const entiende = respuestas.bueno.noul > 0.7 && respuestas.lluvia.noul < 0.3;
+    jevEstado.textContent = `Conectado (${modelo})${entiende ? " · entiende español" : " · duda con el español"}`;
+  } catch (e) {
+    console.error("jev:", e);
+    jevEstado.textContent = e instanceof Error ? e.message : "No se pudo conectar";
+  } finally {
+    jevProbar.disabled = false;
+  }
 });
 
 // ---------- Notificaciones de Windows ----------

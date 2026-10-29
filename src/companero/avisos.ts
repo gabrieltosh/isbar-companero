@@ -3,7 +3,8 @@
 // El estado (estado/*) vive solo en la ventana del compañero: aquí se inicia.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { EVENTO_AJUSTES, GLOBOS_POR_DEFECTO, type ConfigGlobos } from "../ajustes";
+import { EVENTO_AJUSTES, GLOBOS_POR_DEFECTO, JEV_POR_DEFECTO, type ConfigGlobos, type ConfigJev } from "../ajustes";
+import { jevDisponible, preguntarJev } from "../estado/jev";
 import { responder, responderMusica } from "./respuestas";
 import { beber, configAgua, iniciarAgua, mlHoy, recordatorioAgua } from "../estado/agua";
 import {
@@ -47,6 +48,8 @@ const DURACION_CANCION = 5000;
 const DURACION_AVISO = 9000;
 /** "Más tarde" vuelve a mostrar la notificación pasado este tiempo. */
 const POSPONER_NOTIFICACION = 10 * 60_000;
+/** Con menos confianza que esto, la decisión de Jev no se usa y la notificación sale normal. */
+const CONFIANZA_JEV = 0.55;
 /** Apps cuya notificación ya se ve en el globo de la canción. */
 const REPRODUCTORES = /spotify|music|música|media player|reproductor/i;
 
@@ -80,17 +83,62 @@ async function sugerirQuitarBanners(): Promise<void> {
   });
 }
 
-function avisarNotificacion(n: Notificacion): void {
+// ---------- Filtro con Jev ----------
+
+let configJev: ConfigJev = JEV_POR_DEFECTO;
+
+async function cargarConfigJev(): Promise<void> {
+  configJev = { ...JEV_POR_DEFECTO, ...(await leer<Partial<ConfigJev>>("jevConfig", {})) };
+}
+
+type Importancia = "urgente" | "normal" | "ruido";
+
+/**
+ * Con Jev activado, decide si la notificación es urgente, normal o ruido. Si está apagado, falla,
+ * tarda o duda, es «normal» (lo de siempre). Cada decisión queda en la consola para comparar.
+ */
+async function clasificarNotificacion(n: Notificacion): Promise<Importancia> {
+  if (!jevDisponible(configJev) || !configJev.notificaciones) return "normal";
+  try {
+    const { respuestas } = await preguntarJev(
+      configJev.clave,
+      { app: n.app, titulo: n.titulo, texto: n.texto, hora: new Date().toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }) },
+      {
+        importancia: {
+          type: "choice",
+          instructions: "Qué importancia tiene esta notificación del ordenador para la persona que lo está usando",
+          criteria: {
+            urgente:
+              "Hay que verla ya: alguien espera una respuesta inmediata, una reunión o llamada empieza ahora, un error grave, un aviso de seguridad o un pago",
+            normal: "Un mensaje o aviso que conviene leer, pero puede esperar unos minutos",
+            ruido: "Publicidad, promociones, novedades o consejos de una app, avisos automáticos sin importancia",
+          },
+        },
+      },
+    );
+    const r = respuestas.importancia;
+    console.info(`jev: «${n.app} · ${n.titulo}» → ${r.choice} (${Math.round(r.confidence * 100)} %)`);
+    if (r.confidence < CONFIANZA_JEV) return "normal";
+    return r.choice === "urgente" || r.choice === "ruido" ? r.choice : "normal";
+  } catch (e) {
+    console.warn("jev: sin decisión, notificación normal:", e);
+    return "normal";
+  }
+}
+
+/** Globo de una notificación. Las urgentes pasan delante y esperan aunque estés fuera (hasta que respondas). */
+function avisarNotificacion(n: Notificacion, urgente = false): void {
   const abrir = () => invoke("abrir_notificacion", { id: n.id }).catch(console.error);
   avisar({
-    origen: n.app,
+    origen: urgente ? `${n.app} · urgente` : n.app,
     titulo: n.titulo || n.app,
     texto: n.texto,
     imagen: n.icono,
-    duracion: DURACION_NOTIFICACION,
-    gesto: "notificacion",
+    duracion: urgente ? 0 : DURACION_NOTIFICACION,
+    gesto: urgente ? "sorpresa" : "notificacion",
+    urgente,
     // Varias seguidas de la misma app: solo la última (todas siguen en la pestaña Avisos)
-    grupo: `notificacion:${n.app}`,
+    grupo: urgente ? undefined : `notificacion:${n.app}`,
     acciones: [
       { id: "abrir", texto: "Abrir", principal: true },
       { id: "luego", texto: "Más tarde" },
@@ -104,7 +152,7 @@ function avisarNotificacion(n: Notificacion): void {
       // Se queda en Windows y vuelve a salir dentro de un rato
       if (accion === "luego") {
         responder("nose");
-        window.setTimeout(() => avisarNotificacion(n), POSPONER_NOTIFICACION);
+        window.setTimeout(() => avisarNotificacion(n, urgente), POSPONER_NOTIFICACION);
       }
       // Al borrarla, asiente cuando Windows cuenta un aviso menos (iniciarRespuestas)
       if (accion === "descartar") invoke("eliminar_notificacion", { id: n.id }).catch(console.error);
@@ -113,9 +161,14 @@ function avisarNotificacion(n: Notificacion): void {
 }
 
 function iniciarNotificaciones(): void {
-  listen<Notificacion>("notification-new", ({ payload }) => {
+  void cargarConfigJev();
+  listen(EVENTO_AJUSTES, () => void cargarConfigJev()).catch(console.error);
+  listen<Notificacion>("notification-new", async ({ payload }) => {
     if (musicaSonando() && REPRODUCTORES.test(payload.app)) return;
-    avisarNotificacion(payload);
+    const importancia = await clasificarNotificacion(payload);
+    // El ruido no sale en globo (sigue en Windows y en la pestaña Avisos)
+    if (importancia === "ruido") return;
+    avisarNotificacion(payload, importancia === "urgente");
     void sugerirQuitarBanners();
   }).catch(console.error);
 

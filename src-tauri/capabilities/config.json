@@ -2,12 +2,22 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "config",
   "description": "Permisos de la ventana de configuración",
-  "windows": ["config"],
+  "windows": [
+    "config"
+  ],
   "permissions": [
     "core:default",
     "store:default",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://api.typesafe.ai/*"
+        }
+      ]
+    }
   ]
 }

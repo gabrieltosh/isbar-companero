@@ -37,6 +37,17 @@
       </section>
 
       <section>
+        <h2>Inteligencia (Jev)</h2>
+        <p class="ayuda">Con <b>Jev</b> (TypeSafe), el compañero decide mejor algunas cosas, como qué notificaciones son urgentes y cuáles son ruido. Hace falta tu clave de API de <b>typesafe.ai</b> y conexión a internet; sin ella, todo sigue funcionando como siempre. Cuesta muy poco: se paga por lo que se envía.</p>
+        <p class="ayuda"><b>Qué sale del PC:</b> con «Filtrar notificaciones», la app, el título y el texto de cada notificación. Nada más, y solo con Jev activado.</p>
+        <label>Usar Jev <input type="checkbox" class="interruptor" data-campo="jev.activo" /></label>
+        <label>Clave de API <input type="password" id="jev-clave" placeholder="Pega aquí tu clave" autocomplete="off" spellcheck="false" /></label>
+        <label>Conexión <span><output id="jev-estado"></output> <button type="button" class="probar" id="jev-probar">Probar</button></span></label>
+        <label>Filtrar notificaciones <input type="checkbox" class="interruptor" data-campo="jev.notificaciones" /></label>
+        <p class="ayuda">Las urgentes salen primero; el ruido (publicidad, novedades de apps) no sale en globo, aunque sigue en la pestaña Avisos.</p>
+      </section>
+
+      <section>
         <h2>Notificaciones de Windows</h2>
         <p class="ayuda">El compañero te enseña tus notificaciones en globos. Para no verlas dos veces, activa <b>No molestar</b> (Windows 11) o el <b>Asistente de concentración: solo alarmas</b> (Windows 10), o quita los <b>banners</b> de cada app. Siguen llegando al Centro de notificaciones y el compañero las sigue viendo.</p>
         <label>Ajustes de notificaciones de Windows <button type="button" class="probar" id="ajustes-banners">Abrir</button></label>
