@@ -218,6 +218,12 @@ export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
 }
 
 // ---------- Extras (no se transforman: aparecen y desaparecen con un fundido) ----------
+// Los que salen fuera del compañero llevan un borde fino oscuro para verse sobre fondos claros.
+
+const BORDE = "#0B0B0C";
+/** Relleno con borde fino oscuro por fuera (el borde se pinta debajo del relleno). */
+const conBorde = (c: string, ancho = 1.3) =>
+  `fill="${c}" stroke="${BORDE}" stroke-width="${ancho}" stroke-linejoin="round" paint-order="stroke"`;
 
 function espiral(x: number, y: number, giro: number, c: string): string {
   let d = "";
@@ -230,11 +236,15 @@ function espiral(x: number, y: number, giro: number, c: string): string {
 }
 
 const estrella = (x: number, y: number, s: number, c: string) =>
-  `<path d="M${n(x)} ${n(y - 6 * s)} Q${n(x + 1.2 * s)} ${n(y - 1.2 * s)} ${n(x + 6 * s)} ${n(y)} Q${n(x + 1.2 * s)} ${n(y + 1.2 * s)} ${n(x)} ${n(y + 6 * s)} Q${n(x - 1.2 * s)} ${n(y + 1.2 * s)} ${n(x - 6 * s)} ${n(y)} Q${n(x - 1.2 * s)} ${n(y - 1.2 * s)} ${n(x)} ${n(y - 6 * s)} Z" fill="${c}"/>`;
+  `<path d="M${n(x)} ${n(y - 6 * s)} Q${n(x + 1.2 * s)} ${n(y - 1.2 * s)} ${n(x + 6 * s)} ${n(y)} Q${n(x + 1.2 * s)} ${n(y + 1.2 * s)} ${n(x)} ${n(y + 6 * s)} Q${n(x - 1.2 * s)} ${n(y + 1.2 * s)} ${n(x - 6 * s)} ${n(y)} Q${n(x - 1.2 * s)} ${n(y - 1.2 * s)} ${n(x)} ${n(y - 6 * s)} Z" ${conBorde(c, 1.2)}/>`;
 
-/** Notita musical que sube y se desvanece (k de 0 a 1). */
+/** Notita musical que sube y se desvanece (k de 0 a 1). El palo lleva una línea oscura debajo como borde. */
 const nota = (x: number, y: number, k: number, c: string) =>
-  `<g opacity="${n(1 - k)}" transform="translate(${n(x + k * 10)} ${n(y - k * 26)})"><path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" fill="none"/><circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
+  `<g opacity="${n(1 - k)}" transform="translate(${n(x + k * 10)} ${n(y - k * 26)})">` +
+  `<path d="M0 0v-9l6-2v9" stroke="${BORDE}" stroke-width="4.4" stroke-linejoin="round" fill="none"/>` +
+  `<circle cx="-1.5" cy="0" r="2.6" fill="${BORDE}"/><circle cx="4.5" cy="-2" r="2.6" fill="${BORDE}"/>` +
+  `<path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" stroke-linejoin="round" fill="none"/>` +
+  `<circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
 
 /** Lo que acompaña a una expresión y no forma parte de los ojos ni la boca. */
 export function dibujarExtras(expresion: Expresion, t: number, progreso: number, p: Pose, c: string): string {
@@ -251,8 +261,9 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
       return s;
     }
     case "saludo": {
-      const a = Math.sin(t / 45) * 25;
-      return `<g transform="translate(66 34) rotate(${n(a)})"><path d="M0 0 L0 -12" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/><circle cx="0" cy="-14" r="3.4" fill="${c}"/></g>`;
+      // La mano: solo un círculo que se balancea de un lado a otro junto a la cara
+      const a = Math.sin(t / 45) * 28;
+      return `<g transform="translate(66 38) rotate(${n(a)})"><circle cx="0" cy="-13" r="4.2" ${conBorde(c)}/></g>`;
     }
     case "guino": {
       if (progreso <= 0.12 || progreso >= 0.75) return "";
@@ -261,17 +272,17 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     }
     case "preocupado": {
       const k = (t % 1600) / 1600;
-      return `<path d="M53 ${n(12 + k * 8)}c2.2 3 3.4 4.5 3.4 6a3.4 3.4 0 0 1-6.8 0c0-1.5 1.2-3 3.4-6z" fill="#7FB8FF" opacity="${n(1 - k * 0.6)}"/>`;
+      return `<path d="M53 ${n(12 + k * 8)}c2.2 3 3.4 4.5 3.4 6a3.4 3.4 0 0 1-6.8 0c0-1.5 1.2-3 3.4-6z" fill="#7FB8FF" stroke="${BORDE}" stroke-width="1.1" paint-order="stroke" opacity="${n(1 - k * 0.6)}"/>`;
     }
     case "pensativo":
-      return `<circle cx="62" cy="10" r="2" fill="${c}"/><circle cx="69" cy="3" r="3" fill="${c}"/>`;
+      return `<circle cx="62" cy="10" r="2.2" ${conBorde(c)}/><circle cx="69" cy="3" r="3.2" ${conBorde(c)}/>`;
     case "musica":
       return nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
     case "silba":
       return nota(58, 30, (t % 2000) / 2000, c);
     case "dormido": {
       const k = (t % 1800) / 1800;
-      return `<text x="56" y="${n(6 - k * 15)}" fill="${c}" opacity="${n(1 - k)}" font-size="12" font-family="Segoe UI, sans-serif">z</text>`;
+      return `<text x="56" y="${n(6 - k * 15)}" ${conBorde(c, 2.4)} opacity="${n(1 - k)}" font-size="12" font-weight="600" font-family="Segoe UI, sans-serif">z</text>`;
     }
     default:
       return "";
