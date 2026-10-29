@@ -53,6 +53,18 @@ export interface Rasgos {
   boca: Boca;
 }
 
+/** Cómo suena la música (ritmo.ts), para cantar y sacar notitas al ritmo. */
+export interface MusicaPose {
+  /** Nivel de ahora (0 a 1) */
+  energia: number;
+  /** Nivel medio de esta parte de la canción (0 a 1): tranquila o intensa */
+  intensidad: number;
+  /** Notitas en el aire: cuándo nacieron y de qué lado salen */
+  notas: { nace: number; lado: number }[];
+  /** Lo que tarda cada notita en subir y desvanecerse (ms) */
+  vidaNota: number;
+}
+
 /** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
 export interface Pose {
   /** Desplazamiento de la mirada, en px (aprox. ±4) */
@@ -64,6 +76,8 @@ export interface Pose {
   giro: number;
   /** Rebote vertical, en px */
   salto: number;
+  /** Con música sonando y audio, cómo suena; si no, se canta con un ritmo fijo */
+  musica?: MusicaPose;
 }
 
 /** Centros de los ojos y de la boca en la cara (64×64). */
@@ -115,8 +129,11 @@ function cansancio(bo: number): Rasgos {
   return iguales(o, boca(6 + bo * 6, -abierta * 0.6 * bo, Math.max(0.5, abierta * bo), 0, 0, 3 * bo));
 }
 
-/** Los rasgos de cada expresión. `t` (ms) mueve lo que se repite; `progreso` (0 a 1), los gestos de una vez. */
-export function rasgosDe(expresion: Expresion, t: number, progreso: number): Rasgos {
+/**
+ * Los rasgos de cada expresión. `t` (ms) mueve lo que se repite; `progreso` (0 a 1), los gestos
+ * de una vez; `musica`, cómo suena la canción (para cantar al ritmo).
+ */
+export function rasgosDe(expresion: Expresion, t: number, progreso: number, musica?: MusicaPose): Rasgos {
   switch (expresion) {
     case "feliz":
     case "saludo":
@@ -154,8 +171,14 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number): Ras
       return iguales(OJO_NORMAL, boca(9, -a, a, 0, 0, 3));
     }
     case "musica": {
-      const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
-      return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
+      if (!musica) {
+        const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
+        return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
+      }
+      // La boca se abre con el volumen; en las partes intensas aprieta los ojos de gusto
+      const a = 1 + Math.min(1, musica.energia * 2.2) * 6;
+      const intensa = limitar((musica.intensidad - 0.15) * 4, 0, 1);
+      return iguales(mezclarObj(OJO_FELIZ, ojo(11, 2.6, -2.6, 12), intensa), boca(9 + a * 0.4, -a, a, 0, 0, 3));
     }
     case "silba":
       return iguales(ojo(8.4, 4.2, 4.2, 0, 0, -1), boca(5.2, -2.6, 2.6, 0, 2, 3));
@@ -279,6 +302,15 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     case "pensativo":
       return `<circle cx="62" cy="10" r="2.2" ${conBorde(c)}/><circle cx="69" cy="3" r="3.2" ${conBorde(c)}/>`;
     case "musica":
+      if (p.musica) {
+        // Notitas que salen con los golpes de la canción, de un lado o del otro
+        const vida = p.musica.vidaNota;
+        return p.musica.notas
+          .map((nt) => ({ k: (t - nt.nace) / vida, lado: nt.lado }))
+          .filter(({ k }) => k >= 0 && k < 1)
+          .map(({ k, lado }) => (lado > 0 ? nota(58, 30, k, c) : nota(-4, 26, k, c)))
+          .join("");
+      }
       return nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
     case "silba":
       return nota(58, 30, (t % 2000) / 2000, c);

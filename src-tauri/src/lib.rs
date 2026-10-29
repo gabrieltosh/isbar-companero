@@ -7,6 +7,8 @@ mod tray;
 mod window;
 
 #[cfg(target_os = "windows")]
+mod audio;
+#[cfg(target_os = "windows")]
 mod fullscreen;
 #[cfg(target_os = "windows")]
 mod media;
@@ -50,6 +52,7 @@ pub fn run() {
         media::media_next,
         media::media_previous,
         media::media_seek,
+        audio::escuchar_audio,
         notifications::abrir_ajustes_notificaciones,
         notifications::abrir_ajustes_banners,
         notifications::contar_notificaciones,
@@ -89,6 +92,7 @@ pub fn run() {
             {
                 fullscreen::iniciar(app.handle().clone());
                 media::iniciar(app.handle().clone());
+                audio::iniciar(app.handle().clone());
                 notifications::iniciar(app.handle().clone());
             }
             Ok(())

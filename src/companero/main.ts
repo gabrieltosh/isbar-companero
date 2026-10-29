@@ -19,6 +19,7 @@ import { beber } from "../estado/agua";
 import { alternarPomodoro } from "../estado/pomodoro";
 import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { iniciarPuente } from "./puente";
+import { VIDA_NOTA, apagarLatido, golpe, hayAudio, iniciarRitmo, ritmo } from "./ritmo";
 import { decidir, esDeNoche, gesto, hayGesto } from "./vida";
 
 /** Con tamaño 1; deben coincidir con MARGEN y LADO de companero.rs */
@@ -137,6 +138,11 @@ function fotograma(ahora: number): void {
   }
   expresionActual = expresion;
   progresoActual = progreso;
+  // Con música y audio, canta y baila según cómo suena la canción
+  const conRitmo = expresion === "musica" && hayAudio();
+  pose.musica = conRitmo
+    ? { energia: ritmo.energia, intensidad: ritmo.intensidad, notas: ritmo.notas, vidaNota: VIDA_NOTA }
+    : undefined;
 
   // Mirada: escondido en un borde, hacia dentro; con el cursor cerca, lo sigue (ojos, cabeza
   // y se inclina un poco hacia él); solo, mira a su alrededor
@@ -197,8 +203,14 @@ function fotograma(ahora: number): void {
       salto = -Math.abs(Math.sin(ahora / 60)) * 2 * movimiento;
       break;
     case "musica":
-      giro += Math.sin(ahora / 130) * 10 * movimiento;
-      salto = -Math.abs(Math.sin(ahora / 130)) * 2.5 * movimiento;
+      if (conRitmo) {
+        // Se balancea hacia un lado en cada golpe y salta con él; más cuanto más intensa la canción
+        giro += ritmo.lado * 9 * Math.min(1, ritmo.media * 4) * movimiento;
+        salto = -ritmo.latido * (2.5 + ritmo.intensidad * 6) * movimiento;
+      } else {
+        giro += Math.sin(ahora / 130) * 10 * movimiento;
+        salto = -Math.abs(Math.sin(ahora / 130)) * 2.5 * movimiento;
+      }
       break;
     case "mareado":
       giro += Math.sin(ahora / 110) * 9;
@@ -235,6 +247,7 @@ function fotograma(ahora: number): void {
   // Paseo: se estira en la dirección en que lo mueves y se balancea como un péndulo
   const dt = Math.min(3, (ahora - ultimoFotograma) / 16.7);
   ultimoFotograma = ahora;
+  apagarLatido(dt);
   if (arrastrando && paseo.ultima && ahora - paseo.ultima.t > 80) {
     // Lo tienes cogido pero quieto: la velocidad cae a cero
     paseo.vx *= 0.8;
@@ -285,7 +298,7 @@ const suavizar = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t +
 /** La cara actual: durante un cambio, los rasgos se transforman y los extras se funden. */
 function dibujarConMorph(ahora: number): string {
   const c = config.color;
-  const objetivo = rasgosDe(expresionActual, ahora, progresoActual);
+  const objetivo = rasgosDe(expresionActual, ahora, progresoActual, pose.musica);
   const extrasNuevos = dibujarExtras(expresionActual, ahora, progresoActual, pose, c);
   if (!morph) {
     rasgosVistos = objetivo;
@@ -497,6 +510,13 @@ listen("menu-pomodoro", () => {
   alternarPomodoro();
   gesto("guino", DURACION_GUINO);
 }).catch(console.error);
+// En cada golpe de la música, un pequeño aplastamiento del cuerpo
+golpe.escuchar(() => {
+  if (expresionActual !== "musica" || config.tranquilo) return;
+  escalaX = Math.max(escalaX, 1.05);
+  escalaY = Math.min(escalaY, 0.94);
+});
+
 // Se intentó abrir la app otra vez: el compañero que ya está saluda
 listen("otra-copia", () => gesto("saludo", 2200)).catch(console.error);
 listen("menu-agua", () => {
@@ -519,5 +539,6 @@ cursor = { x: centro(), y: centro() };
 gesto("saludo", 2600);
 iniciarAvisos();
 iniciarPuente();
+iniciarRitmo();
 requestAnimationFrame(fotograma);
 window.setTimeout(parpadear, 1500);
