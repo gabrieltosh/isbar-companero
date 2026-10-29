@@ -62,6 +62,14 @@ export const TAMANOS_COMPANERO: [string, string][] = [
   ["1.25", "Grande"],
 ];
 
+/** Qué cuenta el compañero en sus globos. */
+export interface ConfigGlobos {
+  /** Un globo con la canción cada vez que cambia */
+  cancion: boolean;
+}
+
+export const GLOBOS_POR_DEFECTO: ConfigGlobos = { cancion: true };
+
 /** Sonido común de los avisos (pausas activas y recordatorio de agua). */
 export interface ConfigSonido {
   activo: boolean;

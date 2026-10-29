@@ -89,6 +89,10 @@ estado del sistema y el tiempo, con sus reacciones. Ver «Añadido fuera del pla
   señal, se queda caída y se ilumina al volver); poca batería y volumen, un icono pequeño (tiene
   prioridad sobre el paraguas). El tiempo se vive con escenas alrededor (ver fase 6).
 - **Sonidos opcionales**: blips cortos y suaves, desactivados por defecto.
+- **Globos sin amontonarse**: si llevas 2 min sin usar el PC, los globos pasajeros no se guardan
+  (los que esperan respuesta, sí); un pasajero que espera más de 1 min caduca; otra canción u otra
+  notificación de la misma app sustituye a la que esperaba. En Configuración → Globos se puede
+  apagar el aviso de cambio de canción.
 - **Menú con clic derecho**: opciones como pensamientos sueltos que salen del compañero.
   «Esconderme» lo lleva al lado más cercano de la pantalla, asomando media cara (si ya está
   escondido, «Salir de aquí»); «Adiós por ahora» se despide con la mano y se oculta hasta que se

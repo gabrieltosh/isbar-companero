@@ -3,6 +3,7 @@
 // El estado (estado/*) vive solo en la ventana del compañero: aquí se inicia.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { EVENTO_AJUSTES, GLOBOS_POR_DEFECTO, type ConfigGlobos } from "../ajustes";
 import { responder, responderMusica } from "./respuestas";
 import { beber, configAgua, iniciarAgua, mlHoy, recordatorioAgua } from "../estado/agua";
 import {
@@ -88,6 +89,8 @@ function avisarNotificacion(n: Notificacion): void {
     imagen: n.icono,
     duracion: DURACION_NOTIFICACION,
     gesto: "notificacion",
+    // Varias seguidas de la misma app: solo la última (todas siguen en la pestaña Avisos)
+    grupo: `notificacion:${n.app}`,
     acciones: [
       { id: "abrir", texto: "Abrir", principal: true },
       { id: "luego", texto: "Más tarde" },
@@ -141,6 +144,11 @@ function iniciarNotificaciones(): void {
 // ---------- Música ----------
 
 let globoCancion: number | null = null;
+let configGlobos: ConfigGlobos = GLOBOS_POR_DEFECTO;
+
+async function cargarConfigGlobos(): Promise<void> {
+  configGlobos = { ...GLOBOS_POR_DEFECTO, ...(await leer<Partial<ConfigGlobos>>("globosConfig", {})) };
+}
 
 function controlesMusica(info: Readonly<InfoMedia> | null) {
   return [
@@ -156,8 +164,11 @@ function controlesMusica(info: Readonly<InfoMedia> | null) {
 
 function iniciarCanciones(): void {
   iniciarMusica();
+  void cargarConfigGlobos();
+  listen(EVENTO_AJUSTES, () => void cargarConfigGlobos()).catch(console.error);
   cambioCancion.escuchar((info) => {
-    if (!info.reproduciendo) return;
+    // Se puede apagar en Configuración → Globos
+    if (!info.reproduciendo || !configGlobos.cancion) return;
     if (globoCancion !== null && globoActual() === globoCancion) cerrar(globoCancion);
     globoCancion = avisar({
       origen: info.app ? `Sonando en ${info.app}` : "Sonando",
@@ -165,6 +176,8 @@ function iniciarCanciones(): void {
       texto: info.artista,
       imagen: info.caratula,
       duracion: DURACION_CANCION,
+      // Otra canción sustituye a la que esperaba su turno
+      grupo: "cancion",
       acciones: controlesMusica(info),
       alAccion: (accion) => {
         responderMusica(accion);

@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 import {
   AGUA_POR_DEFECTO,
   CLIMA_POR_DEFECTO,
+  GLOBOS_POR_DEFECTO,
   COLORES_COMPANERO,
   COMPANERO_POR_DEFECTO,
   ESCENAS_PRUEBA,
@@ -17,6 +18,7 @@ import {
   type ConfigAgua,
   type ConfigClima,
   type ConfigCompanero,
+  type ConfigGlobos,
   type ConfigPausas,
   type ConfigPomodoro,
   type ConfigSonido,
@@ -34,6 +36,7 @@ const grupos: {
   sonido: ConfigSonido;
   companero: ConfigCompanero;
   clima: ConfigClima;
+  globos: ConfigGlobos;
 } = {
   pomodoro: await leer("pomodoroConfig", POMODORO_POR_DEFECTO),
   agua: await leer("aguaConfig", AGUA_POR_DEFECTO),
@@ -41,6 +44,7 @@ const grupos: {
   sonido: { ...SONIDO_POR_DEFECTO, ...(await leer<Partial<ConfigSonido>>("sonidoConfig", {})) },
   companero: { ...COMPANERO_POR_DEFECTO, ...(await leer<Partial<ConfigCompanero>>("companeroConfig", {})) },
   clima: { ...CLIMA_POR_DEFECTO, ...(await leer<Partial<ConfigClima>>("climaConfig", {})) },
+  globos: { ...GLOBOS_POR_DEFECTO, ...(await leer<Partial<ConfigGlobos>>("globosConfig", {})) },
 };
 const CLAVES: Record<keyof typeof grupos, string> = {
   pomodoro: "pomodoroConfig",
@@ -49,6 +53,7 @@ const CLAVES: Record<keyof typeof grupos, string> = {
   sonido: "sonidoConfig",
   companero: "companeroConfig",
   clima: "climaConfig",
+  globos: "globosConfig",
 };
 
 async function guardarGrupo(grupo: keyof typeof grupos): Promise<void> {
