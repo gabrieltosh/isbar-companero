@@ -310,6 +310,15 @@ function pintarEstadoLinea(): void {
   const nm = estado?.noMolestar ?? 0;
   if (nm > 0) partes.push(`No molestar · quedan ${nm < 60 ? `${nm} min` : `${Math.round(nm / 60)} h`}`);
   if (sistema?.conexion && !sistema.conexion.internet) partes.push("Sin internet");
+  // Lo que hace el compañero según lo que estás haciendo (Jev)
+  const ACTIVIDAD: Partial<Record<string, string>> = {
+    reunion: "En una reunión · me callo",
+    video: "Viendo un vídeo · quieto y callado",
+    juego: "Jugando · quieto y callado",
+    concentrado: "Concentrado · modo tranquilo",
+  };
+  const actividad = estado?.actividad ? ACTIVIDAD[estado.actividad] : undefined;
+  if (actividad) partes.push(actividad);
   const linea = $(document, "#estado-linea");
   linea.hidden = partes.length === 0;
   linea.textContent = partes.join(" · ");

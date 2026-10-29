@@ -42,8 +42,8 @@ function finDe(d: DuracionNoMolestar): number {
 
 function aplicar(): void {
   const activo = noMolestar();
-  silenciarGlobos(activo);
-  silenciarAvisos(activo);
+  silenciarGlobos("noMolestar", activo);
+  silenciarAvisos("noMolestar", activo);
   window.clearTimeout(tFin);
   if (activo) tFin = window.setTimeout(() => terminar(true), Math.min(hasta - Date.now(), MAX_TIMEOUT));
 }

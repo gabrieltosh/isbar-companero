@@ -3,7 +3,7 @@
 import type { InfoMedia } from "../estado/musica";
 import type { TipoPausa } from "../estado/pausas";
 import type { Modo } from "../estado/pomodoro";
-import type { Estilo } from "../estado/jev";
+import type { Actividad, Estilo } from "../estado/jev";
 
 export interface EstadoPanel {
   pomodoro: {
@@ -49,6 +49,8 @@ export interface EstadoPanel {
   } | null;
   /** Minutos que quedan de «No molestar» (0 si no está activo) */
   noMolestar: number;
+  /** Qué estás haciendo según la ventana activa (Jev), o null */
+  actividad: Actividad | null;
 }
 
 export type OrdenPanel =

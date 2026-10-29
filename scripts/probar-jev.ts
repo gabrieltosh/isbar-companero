@@ -1,10 +1,18 @@
-// Prueba de Jev con canciones y notificaciones reales: hace las mismas preguntas que la app
+// Prueba de Jev con canciones, notificaciones y ventanas reales: hace las mismas preguntas que la app
 // (src/estado/jev.ts) y compara con lo esperado. Sirve para comprobar, al cambiar las preguntas,
 // que sigue acertando. Se ejecuta con `npm run jev:probar`.
 // La clave se toma de TYPESAFE_API_KEY o, si no, de la configuración local de la app (isla.json);
 // nunca se muestra. Cada prueba cuesta muy poco (unos cientos de tokens por pregunta).
 import { readFileSync } from "node:fs";
-import { emocionCancion, estiloCancion, fijarFetchJev, importanciaNotificacion, NOTIFICACIONES_EJEMPLO } from "../src/estado/jev";
+import {
+  actividadVentana,
+  emocionCancion,
+  estiloCancion,
+  fijarFetchJev,
+  importanciaNotificacion,
+  NOTIFICACIONES_EJEMPLO,
+  VENTANAS_EJEMPLO,
+} from "../src/estado/jev";
 
 function claveJev(): string {
   if (process.env.TYPESAFE_API_KEY) return process.env.TYPESAFE_API_KEY;
@@ -73,6 +81,15 @@ for (const { n, r } of notificaciones) {
   aciertos += Number(ok);
   total += 1;
   console.log(`${ok ? "✓" : "✗"} ${(n.app + " · " + n.titulo).padEnd(48)} ${r.importancia.padEnd(8)} (${Math.round(r.confianza * 100)} %)${ok ? "" : `  esperado ${n.esperado}`}`);
+}
+
+console.log("\nQué estás haciendo (ventana activa)\n");
+const ventanas = await Promise.all(VENTANAS_EJEMPLO.map(async (v) => ({ v, r: await actividadVentana(clave, v) })));
+for (const { v, r } of ventanas) {
+  const ok = r.actividad === v.esperado;
+  aciertos += Number(ok);
+  total += 1;
+  console.log(`${ok ? "✓" : "✗"} ${(v.programa + " · " + v.titulo).padEnd(66)} ${r.actividad.padEnd(12)} (${Math.round(r.confianza * 100)} %)${ok ? "" : `  esperado ${v.esperado}`}`);
 }
 
 console.log(`\nAciertos: ${aciertos} de ${total}`);

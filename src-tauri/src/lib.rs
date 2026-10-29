@@ -7,6 +7,8 @@ mod tray;
 mod window;
 
 #[cfg(target_os = "windows")]
+mod activa;
+#[cfg(target_os = "windows")]
 mod audio;
 #[cfg(target_os = "windows")]
 mod debajo;
@@ -106,6 +108,7 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 fullscreen::iniciar(app.handle().clone());
+                activa::iniciar(app.handle().clone());
                 media::iniciar(app.handle().clone());
                 audio::iniciar(app.handle().clone());
                 sistema::iniciar(app.handle().clone());

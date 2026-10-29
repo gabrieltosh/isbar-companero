@@ -31,6 +31,7 @@ import { resumenClima } from "./clima";
 import { pausarGlobos } from "./globos";
 import { minutosNoMolestar } from "./noMolestar";
 import { caracterActual, corregirCaracter } from "./caracter";
+import { actividadActual } from "./actividad";
 import { resumenRitmo } from "./ritmo";
 import { responder, responderMusica } from "./respuestas";
 
@@ -62,6 +63,7 @@ function foto(): EstadoPanel {
     caracter: caracterActual(),
     clima: resumenClima(),
     noMolestar: minutosNoMolestar(),
+    actividad: actividadActual(),
   };
 }
 

@@ -43,6 +43,8 @@ export interface Contexto {
   tranquilo: boolean;
   /** Lo que pide la app (música, un aviso…), o null */
   peticion: Expresion | null;
+  /** Estás en una reunión, viendo un vídeo o jugando: sin ocurrencias ni rutinas (actividad.ts) */
+  quieto: boolean;
 }
 
 export interface Decision {
@@ -152,6 +154,12 @@ export function decidir(ctx: Contexto): Decision {
   // Lo dejaste solo: se duerme, se cansa o hace sus rutinas
   if (dormido) return { expresion: "dormido", rutina: null, progreso: 0 };
   if (ctx.inactivo > CANSADO_DESDE * factor) return { expresion: "cansado", rutina: null, progreso: 0 };
+  // En una reunión, con un vídeo o jugando: quieto, sin rutinas ni ocurrencias
+  if (ctx.quieto) {
+    rutina = null;
+    ocurrencia = null;
+    return { expresion: "normal", rutina: null, progreso: 0 };
+  }
   if (ctx.inactivo > RUTINAS_DESDE) {
     ocurrencia = null;
     if (ctx.ahora > cambioRutina) {

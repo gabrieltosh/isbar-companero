@@ -79,9 +79,12 @@ export interface ConfigJev {
   notificaciones: boolean;
   /** Elige el ánimo y el estilo del baile de cada canción (envía título, artista y tempo) */
   baile: boolean;
+  /** Sabe qué estás haciendo por la ventana activa (envía su programa y su título): en una
+   * reunión se calla, con un vídeo o un juego se queda quieto… Apagado por defecto. */
+  actividad: boolean;
 }
 
-export const JEV_POR_DEFECTO: ConfigJev = { activo: false, clave: "", notificaciones: true, baile: true };
+export const JEV_POR_DEFECTO: ConfigJev = { activo: false, clave: "", notificaciones: true, baile: true, actividad: false };
 
 /** Sonido común de los avisos (pausas activas y recordatorio de agua). */
 export interface ConfigSonido {

@@ -28,6 +28,7 @@ import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
 import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
 import { caracterActual, iniciarCaracter } from "./caracter";
+import { iniciarActividad, modoActividad } from "./actividad";
 import { dibujarTiempo } from "./tiempo";
 import { iniciarRespuestas } from "./respuestas";
 import { curioseoPara, entornoDe, reaccionPara, visitar, type Debajo } from "./entorno";
@@ -170,8 +171,10 @@ function fotograma(ahora: number): void {
     escribiendo: inactivo < ESCRIBIENDO_MS && ahora - ultimoMovimiento > ESCRIBIENDO_MS,
     sesion: ahora - sesionDesde,
     noche,
-    tranquilo: config.tranquilo,
+    // Concentrado (programando, escribiendo…): como en modo tranquilo
+    tranquilo: config.tranquilo || modoActividad().tranquilo,
     peticion: peticionApp(),
+    quieto: modoActividad().quieto,
   });
   if (expresion !== expresionActual) {
     // Empieza desde lo que se ve ahora (aunque estuviera a mitad de otro cambio)
@@ -910,6 +913,7 @@ iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
 void iniciarCaracter();
+iniciarActividad();
 iniciarSistema();
 void iniciarClima();
 iniciarRespuestas();

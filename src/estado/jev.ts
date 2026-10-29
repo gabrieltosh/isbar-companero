@@ -278,3 +278,51 @@ export async function caracterCancion(clave: string, c: DatosCancion): Promise<C
   const [emocion, estilo] = await Promise.all([emocionCancion(clave, c), estiloCancion(clave, c)]);
   return { ...emocion, ...estilo };
 }
+
+// ---------- Qué estás haciendo (ventana activa) ----------
+
+export type Actividad = "reunion" | "concentrado" | "video" | "juego" | "charla" | "navegando" | "otro";
+
+/** La ventana activa: programa (p. ej. "ms-teams.exe") y título. */
+export interface DatosVentana {
+  programa: string;
+  titulo: string;
+}
+
+const ACTIVIDADES: Record<Actividad, string> = {
+  reunion: "En una reunión, videollamada o llamada ahora mismo (Teams, Zoom, Meet, Webex, Discord en llamada…)",
+  concentrado: "Concentrado trabajando: programando, escribiendo un documento, una hoja de cálculo, diseñando o estudiando",
+  video: "Viendo un vídeo, una película, una serie o un directo",
+  juego: "Jugando a un videojuego",
+  charla: "Chateando o leyendo el correo o mensajes",
+  navegando: "Navegando por internet, leyendo noticias o redes sociales",
+  otro: "Otra cosa: explorador de archivos, ajustes, el escritorio…",
+};
+
+/** Pregunta a Jev qué está haciendo la persona según la ventana activa. */
+export async function actividadVentana(clave: string, v: DatosVentana): Promise<{ actividad: Actividad; confianza: number }> {
+  const { respuestas } = await preguntarJev(
+    clave,
+    { programa: v.programa, titulo_de_la_ventana: v.titulo },
+    { actividad: { type: "choice", instructions: "Qué está haciendo ahora la persona que usa el ordenador, según la ventana que tiene delante", criteria: ACTIVIDADES } },
+  );
+  const r = respuestas.actividad;
+  return { actividad: (r.choice in ACTIVIDADES ? r.choice : "otro") as Actividad, confianza: r.confidence };
+}
+
+/** Ventanas inventadas para probar (con lo que se espera). */
+export const VENTANAS_EJEMPLO: (DatosVentana & { esperado: Actividad })[] = [
+  { programa: "ms-teams.exe", titulo: "Reunión de seguimiento semanal | Microsoft Teams", esperado: "reunion" },
+  { programa: "zoom.exe", titulo: "Zoom Meeting", esperado: "reunion" },
+  { programa: "chrome.exe", titulo: "Meet - abc-defg-hij - Google Chrome", esperado: "reunion" },
+  { programa: "code.exe", titulo: "main.ts - isbar-companero - Visual Studio Code", esperado: "concentrado" },
+  { programa: "winword.exe", titulo: "Informe trimestral.docx - Word", esperado: "concentrado" },
+  { programa: "excel.exe", titulo: "Presupuesto 2026.xlsx - Excel", esperado: "concentrado" },
+  { programa: "chrome.exe", titulo: "Lo-fi beats para estudiar - YouTube - Google Chrome", esperado: "video" },
+  { programa: "vlc.exe", titulo: "Interstellar.mkv - Reproductor multimedia VLC", esperado: "video" },
+  { programa: "eldenring.exe", titulo: "ELDEN RING™", esperado: "juego" },
+  { programa: "ms-teams.exe", titulo: "Chat | Ana García | Microsoft Teams", esperado: "charla" },
+  { programa: "olk.exe", titulo: "Bandeja de entrada - Outlook", esperado: "charla" },
+  { programa: "msedge.exe", titulo: "Últimas noticias - El País - Microsoft Edge", esperado: "navegando" },
+  { programa: "explorer.exe", titulo: "Descargas", esperado: "otro" },
+];

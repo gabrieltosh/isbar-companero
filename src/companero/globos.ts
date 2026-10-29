@@ -47,8 +47,8 @@ let actual: EnCola | null = null;
 let tSiguiente = 0;
 /** Con el panel abierto los globos esperan en la cola. */
 let pausados = false;
-/** «No molestar» activo. */
-let silencio = false;
+/** Por qué se callan los globos ahora («No molestar», en una reunión…); vacío si no se callan. */
+const silencios = new Set<string>();
 /** Llevas un rato sin tocar el PC. */
 let ausente = false;
 
@@ -82,7 +82,7 @@ function mostrarSiguiente(): void {
   const ahora = Date.now();
   descartarPasajeros((a) => ahora - a.creado > CADUCA_MS);
   if (cola.length === 0) return;
-  const i = silencio ? cola.findIndex((a) => a.menu) : 0;
+  const i = silencios.size > 0 ? cola.findIndex((a) => a.menu) : 0;
   if (i < 0) return;
   actual = cola.splice(i, 1)[0] ?? null;
   if (!actual) return;
@@ -93,7 +93,7 @@ function mostrarSiguiente(): void {
 /** Pide un globo. Devuelve su id (para actualizarlo o cerrarlo). */
 export function avisar(aviso: Aviso): number {
   const nuevo: EnCola = { ...aviso, id: siguienteId++, creado: Date.now() };
-  if ((silencio || ausente) && pasajero(aviso)) return nuevo.id;
+  if ((silencios.size > 0 || ausente) && pasajero(aviso)) return nuevo.id;
   if (aviso.grupo) {
     descartarPasajeros((a) => a.grupo === aviso.grupo);
     if (actual && actual.grupo === aviso.grupo && pasajero(actual)) void emit(EVENTO_CERRAR, { id: actual.id });
@@ -132,10 +132,12 @@ export function pausarGlobos(pausar: boolean): void {
   if (!pausar) mostrarSiguiente();
 }
 
-/** Activa o quita «No molestar»; al quitarlo salen los que esperaban. */
-export function silenciarGlobos(silenciar: boolean): void {
-  silencio = silenciar;
-  if (!silenciar) mostrarSiguiente();
+/** Calla (o deja de callar) los globos por un motivo («No molestar», en una reunión…). Cuando ya
+ * no queda ningún motivo, salen los que esperaban. */
+export function silenciarGlobos(motivo: string, silenciar: boolean): void {
+  if (silenciar) silencios.add(motivo);
+  else silencios.delete(motivo);
+  if (silencios.size === 0) mostrarSiguiente();
 }
 
 /** ¿Hay a la vista un globo que pide atención (una notificación urgente)? */

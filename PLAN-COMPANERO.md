@@ -436,8 +436,16 @@ Hoy las reacciones salen de reglas fijas. Jev decidiría lo que con reglas queda
    - **Expresiones**: muy triste (tono < 0,8), ojos cerrados y de vez en cuando una lágrima; muy
      alegre e intensa (tono > 3, energía > 3,3) en el estribillo, puño en alto (una manita).
    - **Prueba**: `npm run jev:probar` (scripts/probar-jev.ts) hace las mismas preguntas con 12
-     canciones y 8 notificaciones y compara con lo esperado (hoy: 44 de 44).
-6. Saber qué estás haciendo (reunión, código, vídeo…) para ajustar cuánto habla.
+     canciones, 8 notificaciones y 13 ventanas y compara con lo esperado (hoy: 57 de 57).
+6. ~~Saber qué estás haciendo~~ ✅ (`activa.rs` + `actividad.ts`): Rust avisa al cambiar la
+   ventana activa (programa y título) y, cuando lleva 1,5 s delante, Jev dice si es una reunión,
+   estar concentrado, un vídeo, un juego, chatear, navegar u otra cosa (13 de 13 en la prueba).
+   En una reunión, un vídeo o un juego se calla (globos pasajeros fuera, los que esperan
+   respuesta aguardan, sin campanita) y se queda quieto sin bailar; concentrado, modo tranquilo.
+   Interruptor «Saber qué estás haciendo», apagado por defecto (el título de la ventana sale del
+   PC); cada ventana se recuerda solo mientras la app está abierta. Sin Jev o si duda, reglas por
+   programa y título. «No molestar» y la actividad callan por separado sin pisarse. La línea de
+   estado del panel lo cuenta («En una reunión · me callo»).
 7. Experimento «qué hacer ahora».
 
 ## Para más adelante

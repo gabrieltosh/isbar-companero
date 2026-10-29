@@ -40,6 +40,7 @@ import { iniciarSonido } from "../sonido";
 import { guardar, leer } from "../store";
 import type { Expresion } from "./cara";
 import { actualizar, avisar, cerrar, globoActual, iniciarGlobos, pideAtencion } from "./globos";
+import { modoActividad } from "./actividad";
 import { gesto } from "./vida";
 
 /** Lo que tarda en irse cada tipo de globo (ms). */
@@ -379,7 +380,8 @@ function iniciarAvisosPausas(): void {
 export function peticionApp(): Expresion | null {
   // Una urgente a la vista pasa por delante de la música: deja de bailar y la atiende
   if (pideAtencion()) return "notificacion";
-  if (musicaSonando()) return "musica";
+  // En una reunión, con un vídeo o jugando no baila (aunque suene algo)
+  if (musicaSonando() && !modoActividad().quieto) return "musica";
   return null;
 }
 
