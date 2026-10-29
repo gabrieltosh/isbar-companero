@@ -79,8 +79,17 @@ function ajustarTempo(d: number): void {
   ritmo.intervalo += (d - ritmo.intervalo) * (parecido ? 0.25 : 0.06);
 }
 
-function procesar(nivel: number): void {
+/** El sonido más fuerte de hace poco: con él se ajusta la escala (ganancia automática). */
+let pico = 0;
+/** Por debajo de esto (sin ajustar) se considera silencio. */
+const SILENCIO = 0.004;
+
+function procesar(bruto: number): void {
   const ahora = performance.now();
+  // Ganancia automática: el nivel se mide respecto a lo más fuerte que ha sonado hace poco
+  // (baja despacio, unos segundos). Así da igual el dispositivo o el volumen
+  pico = Math.max(bruto, pico * 0.997);
+  const nivel = bruto < SILENCIO ? 0 : Math.min(1, bruto / Math.max(pico, 0.02));
   const paso = ultimoNivel ? Math.min(SIN_AUDIO_MS, ahora - ultimoNivel) : 33;
   ultimoNivel = ahora;
   pulso += paso / ritmo.intervalo;

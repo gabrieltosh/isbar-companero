@@ -2,8 +2,9 @@
 //!
 //! Solo se lee el medidor de pico de Windows (lo mismo que dibuja la barra verde de
 //! Configuración > Sonido): un número de 0 a 1. No se graba ni se analiza el audio.
-//! El medidor mide antes del volumen general, así que se multiplica por ese volumen (y es 0
-//! en silencio): sin volumen, el compañero no baila.
+//! El medidor mide antes del volumen general: si está silenciado o al 0 % se manda 0 (sin
+//! volumen, el compañero no baila). Con cualquier otro volumen se manda el nivel tal cual,
+//! porque unos cascos al 5 % pueden sonar fuerte; el compañero ajusta la escala solo.
 //! El compañero lo pide con `escuchar_audio(true)` mientras suena música; entonces se emite
 //! `audio-nivel` unas 30 veces por segundo.
 
@@ -50,14 +51,14 @@ impl Salida {
         }
     }
 
-    /// Nivel que se oye: el pico por el volumen general (0 si está en silencio).
+    /// Nivel del sonido (0 si está silenciado o con el volumen a cero).
     fn nivel(&self) -> windows::core::Result<f32> {
         // SAFETY: interfaces COM válidas de este hilo.
         unsafe {
-            if self.volumen.GetMute()?.as_bool() {
+            if self.volumen.GetMute()?.as_bool() || self.volumen.GetMasterVolumeLevelScalar()? <= 0.0 {
                 return Ok(0.0);
             }
-            Ok(self.medidor.GetPeakValue()? * self.volumen.GetMasterVolumeLevelScalar()?)
+            self.medidor.GetPeakValue()
         }
     }
 }
