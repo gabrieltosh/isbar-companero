@@ -76,6 +76,9 @@ export const ritmo = {
   presencia: [0, 0, 0] as [number, number, number],
   /** En una pausa, cuánto ha crecido la música (0 a 1): la subida antes del «drop» */
   subida: 0,
+  /** Lo movida que suena la canción (escala de Jev, 0 quieta … 4 para saltar), por el tempo, lo
+   * claro que es el ritmo y si suena batería. Cambia despacio (unos segundos) */
+  energiaOida: 0,
   notas: [] as Nota[],
 };
 
@@ -109,9 +112,25 @@ export function pulsoAhora(): number {
 }
 
 /** Pulsos por minuto y aciertos, para ver en el panel cómo va el reconocimiento. */
-export function resumenRitmo(): { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string } | null {
+export function resumenRitmo(): {
+  ppm: number;
+  confianza: number;
+  golpes: number;
+  partes: number;
+  pausa: boolean;
+  paso: string;
+  energia: number;
+} | null {
   if (!hayAudio()) return null;
-  return { ppm: Math.round(60_000 / ritmo.intervalo), confianza: ritmo.confianza, golpes, partes, pausa: ritmo.pausa, paso: pasoActual() };
+  return {
+    ppm: Math.round(60_000 / ritmo.intervalo),
+    confianza: ritmo.confianza,
+    golpes,
+    partes,
+    pausa: ritmo.pausa,
+    paso: pasoActual(),
+    energia: ritmo.energiaOida,
+  };
 }
 
 /** Cuándo puede salir la siguiente notita. */
@@ -164,6 +183,11 @@ function procesar(e: EstadoAudio): void {
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
   ritmo.subida += (e.subida - ritmo.subida) * 0.2;
+  // Energía oída: tempo (de 90 a 140 ppm), ritmo claro y batería (bombo o caja), en la escala de Jev
+  const tempo = Math.max(0, Math.min(1, (60_000 / e.intervalo - 90) / 50));
+  const bateria = Math.max(ritmo.presencia[0], ritmo.presencia[1]);
+  const oida = 4 * (0.4 * tempo + 0.3 * e.confianza + 0.3 * bateria);
+  ritmo.energiaOida += (oida - ritmo.energiaOida) * 0.01;
   // Cada golpe acerca su presencia a 1 (poco a poco: sin saltos cuando empieza a sonar)
   e.golpes.forEach((g, i) => {
     if (g) ritmo.presencia[i] += (1 - ritmo.presencia[i]) * 0.35;

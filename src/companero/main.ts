@@ -27,7 +27,7 @@ import { avisar, cerrar as cerrarGlobo, globoActual } from "./globos";
 import { activarNoMolestar, iniciarNoMolestar, minutosNoMolestar, noMolestar, quitarNoMolestar, type DuracionNoMolestar } from "./noMolestar";
 import { iniciarPuente } from "./puente";
 import { apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
-import { SIN_BAILE, bailar, pararBaile, pasoActual, type Movimiento } from "./baile";
+import { SIN_BAILE, bailar, energiaBaile, pararBaile, pasoActual, type Movimiento } from "./baile";
 import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
 import { caracterActual, iniciarCaracter } from "./caracter";
@@ -85,7 +85,9 @@ const TONO_BAILABLE = 1.4;
 /** El tono con el que pone la cara (el de Jev, salvo en una canción triste pero bailable). */
 function tonoCara(jev: { tono: number | null; energia: number | null } | null): number | undefined {
   if (jev?.tono == null) return undefined;
-  return (jev.energia ?? 0) >= ENERGIA_BAILABLE ? Math.max(jev.tono, TONO_BAILABLE) : jev.tono;
+  // La energía con la que baila (la de Jev o, si suena más movida, más)
+  const energia = energiaBaile() ?? jev.energia ?? 0;
+  return energia >= ENERGIA_BAILABLE ? Math.max(jev.tono, TONO_BAILABLE) : jev.tono;
 }
 
 /** Concentrado (programando, escribiendo…): baila con tanto de lo normal. */
@@ -233,7 +235,7 @@ function fotograma(ahora: number): void {
   if (conRitmo) {
     // Cuánto baila: lo elegido en la configuración y, si estás concentrado, más discreto
     const factor = (FACTOR_BAILE[config.baile] ?? 1) * (modoActividad().tranquilo ? FACTOR_CONCENTRADO : 1);
-    const oido = { presencia: ritmo.presencia, subida: ritmo.subida, factor };
+    const oido = { presencia: ritmo.presencia, subida: ritmo.subida, energia: ritmo.energiaOida, factor };
     const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa, oido);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;

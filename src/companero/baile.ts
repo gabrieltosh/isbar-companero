@@ -472,6 +472,8 @@ export interface Oido {
   presencia: readonly [number, number, number];
   /** En una pausa, la subida antes del «drop» (0 a 1) */
   subida: number;
+  /** Lo movida que suena la canción (escala de Jev, 0 a 4) */
+  energia: number;
   /** Cuánto se mueve: por la configuración y por lo que hace el usuario (1, normal) */
   factor: number;
 }
@@ -544,11 +546,31 @@ const DESDE_TRISTE = 0.5;
 
 /** Triste y sin energía para bailar: una canción triste pero bailable (Blue Monday) se baila como
  * bailable; si no, casi no bailaba. */
-const triste = () =>
-  caracter?.tono != null && caracter.tono < TONO_TRISTE && !(caracter.energia != null && caracter.energia >= ENERGIA_SALTA);
-const enCalma = () => caracter?.energia != null && caracter.energia < ENERGIA_CALMA;
+const triste = () => {
+  const energia = energiaBaile();
+  return caracter?.tono != null && caracter.tono < TONO_TRISTE && !(energia != null && energia >= ENERGIA_SALTA);
+};
+const enCalma = () => {
+  const energia = energiaBaile();
+  return energia != null && energia < ENERGIA_CALMA;
+};
 /** Sin saltos: canción triste (y lenta) o sin energía para saltar. */
-const sinSaltos = () => triste() || (caracter?.energia != null && caracter.energia < ENERGIA_SALTA);
+const sinSaltos = () => {
+  const energia = energiaBaile();
+  return triste() || (energia != null && energia < ENERGIA_SALTA);
+};
+
+/** Lo movida que suena la canción según el audio (ritmo.ts), o null si no se sabe. */
+let energiaOida: number | null = null;
+
+/** La energía con la que se baila: la de Jev, salvo que lo que se oye sea más movido; entonces, a
+ * medio camino (Jev a veces se queda corto: Countdown, de Pulp, le parecía de energía media). Nunca
+ * la baja: en una parte tranquila de una canción movida, Jev sigue teniendo razón. */
+export function energiaBaile(): number | null {
+  const jev = caracter?.energia;
+  if (jev == null) return null;
+  return energiaOida == null ? jev : Math.max(jev, (jev + energiaOida) / 2);
+}
 
 /** Amplitud de los movimientos según el género (1 = como siempre). */
 const AMPLITUD_ESTILO: Record<Estilo, number> = {
@@ -568,7 +590,8 @@ function amplitudBaile(): number {
   let a = caracter.estilos
     ? Object.entries(caracter.estilos).reduce((s, [e, w]) => s + AMPLITUD_ESTILO[e as Estilo] * (w ?? 0), 0)
     : 1;
-  if (caracter.energia != null) a *= 0.75 + 0.15 * caracter.energia;
+  const energia = energiaBaile();
+  if (energia != null) a *= 0.75 + 0.15 * energia;
   return triste() ? Math.min(1, a * 0.8) : a;
 }
 
@@ -583,7 +606,7 @@ function generoPrincipal(c: CaracterBaile | null): Estilo | null {
  * géneros no se toca: en la fiesta y el reguetón son normales tempos de 90. */
 const PPM_ELECTRONICA_LENTA = 100;
 function correccionElectronica(ppm: number): number {
-  if (generoPrincipal(caracter) !== "electronica" || (caracter?.energia ?? 0) < ENERGIA_SALTA || ppm >= PPM_ELECTRONICA_LENTA) return 1;
+  if (generoPrincipal(caracter) !== "electronica" || (energiaBaile() ?? 0) < ENERGIA_SALTA || ppm >= PPM_ELECTRONICA_LENTA) return 1;
   if (ppm * 1.5 >= 110 && ppm * 1.5 <= 150) return 1.5;
   if (ppm * 2 >= 110 && ppm * 2 <= 150) return 2;
   return 1;
@@ -667,7 +690,7 @@ function elegir(animado: number, ppm: number): Paso {
     (!p.ppm || (ppm >= p.ppm[0] && ppm <= p.ppm[1])) && (saltar || !p.salta) && p.desde <= desdeMax;
   // Con el género de Jev, solo los pasos de ese género (sin repetir los últimos mientras se pueda)
   // Si hay mezcla (Jev duda entre géneros), cada vez se sortea uno según su peso
-  const estilo = caracter?.estilos ? sortearGenero(caracter.estilos) : null;
+  const estilo = caracter?.estilos ? sortearGenero(pesosGenero(caracter.estilos)) : null;
   if (estilo) {
     const genero = PASOS.filter((p) => p.estilos.includes(estilo) && disponible(p));
     if (genero.length >= 2) {
@@ -681,6 +704,16 @@ function elegir(animado: number, ppm: number): Paso {
   const nuevos = encaja.filter((p) => !recientes.includes(p.nombre));
   const opciones = nuevos.length ? nuevos : PASOS.filter((p) => p !== actual && disponible(p));
   return sortear(opciones.length ? opciones : PASOS.filter((p) => p !== actual), animado);
+}
+
+/** Con una canción bailable (por lo que se oye), los géneros calmados pesan menos en el sorteo: si
+ * Jev duda entre tranquila y pop, y suena movida, mejor pasos de pop. */
+function pesosGenero(estilos: Partial<Record<Estilo, number>>): Partial<Record<Estilo, number>> {
+  if ((energiaBaile() ?? 0) < ENERGIA_SALTA) return estilos;
+  const calmados: Estilo[] = ["tranquila", "balada"];
+  const r = Object.fromEntries(Object.entries(estilos).map(([e, w]) => [e, (w ?? 0) * (calmados.includes(e as Estilo) ? 0.35 : 1)]));
+  // Si todo era calmado, se queda como estaba
+  return Object.values(r).some((w) => w > 0) ? r : estilos;
 }
 
 /** Un género de la mezcla, al azar según su peso. */
@@ -717,8 +750,9 @@ function animacion(intensidad: number, intervalo: number): number {
   const ppm = 60_000 / intervalo;
   const tempo = Math.max(0, Math.min(1, (ppm - 85) / 60));
   const local = intensidad * 0.5 + tempo * 0.5;
-  if (caracter?.energia == null) return local;
-  return Math.max(0, Math.min(1, local * 0.4 + (caracter.energia / 4) * 0.6));
+  const energia = energiaBaile();
+  if (energia == null) return local;
+  return Math.max(0, Math.min(1, local * 0.4 + (energia / 4) * 0.6));
 }
 
 /** Cómo baila ahora: movimiento del cuerpo y de la cara, y los ojos del paso. `intervalo`: ms
@@ -735,7 +769,9 @@ export function bailar(
 ): { mov: Movimiento; ojos: OjosBaile } {
   // Medio tiempo: si Jev dice que la canción es calmada pero el ritmo medido es rápido (pasa a
   // menudo en directos y baladas con mucha percusión), se baila a la mitad
-  if (caracter?.energia != null && caracter.energia < ENERGIA_MEDIO_TIEMPO && 60_000 / intervalo > PPM_MEDIO_TIEMPO) {
+  energiaOida = oido?.energia ?? null;
+  const energiaCancion = energiaBaile();
+  if (energiaCancion != null && energiaCancion < ENERGIA_MEDIO_TIEMPO && 60_000 / intervalo > PPM_MEDIO_TIEMPO) {
     pulso /= 2;
     intervalo *= 2;
   }

@@ -37,7 +37,7 @@ export interface EstadoPanel {
     corregido: { tono?: boolean; energia?: boolean; estilo?: boolean };
   } | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
-  ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string } | null;
+  ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string; energia: number } | null;
   /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
   clima: {
     temperatura: number;
