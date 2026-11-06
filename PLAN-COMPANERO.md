@@ -282,6 +282,23 @@ Cada fase termina con algo que funciona y se puede probar.
 - **Según lo que haces**: concentrado, baila discreto; en reuniones, vídeos y juegos no baila.
   Ajuste «Baile» en Configuración: discreto, normal o fiestero.
 - **Rock**: cuernos 🤘 en las partes fuertes con energía.
+- **Energía oída**: además de la de Jev, la que suena (tempo, ritmo claro, batería); si suena más
+  movida, se baila a medio camino (Countdown de Pulp). Triste pero bailable (Blue Monday): se baila
+  como bailable y la cara se pone seria, con los ojos cerrados.
+
+### Aprende cada canción (`aprendizaje.ts`)
+- De cada escucha apunta, por la posición de la canción: la intensidad y el bombo de cada tramo de
+  2 s, el tempo (cuando el ritmo está claro) y dónde empiezan las partes nuevas y los «drops».
+  Al cambiar de canción (si se oyó al menos un 30 %), lo junta con lo que sabía: cada escucha nueva
+  pesa menos (hasta 1/5), las marcas que coinciden se promedian y, desde 3 escuchas, se olvidan las
+  que casi nunca salen. Se guarda en `canciones.json` (menos de 1 KB por canción, 400 como mucho).
+- Cuando vuelve a sonar la misma versión (misma duración): le da su tempo al análisis
+  (`sembrar_tempo` → `ritmo.rs`, en fase desde el primer segundo y ese tempo protegido 6 s); cambia
+  de paso justo cuando empieza cada parte conocida; se contiene en los 4 s antes de un «drop» y lo
+  celebra en su momento (sin repetirlo cuando el análisis lo oye); elige los pasos con la energía de
+  los próximos 6 s. Si saltas a otro momento, se recoloca. El panel dice «La conozco: N escuchas»
+  o «Primera vez que la oigo».
+- Sin duración (algunos navegadores) no aprende: el mapa necesita la posición de la canción.
 
 ## Mejorar el reconocimiento de la música
 

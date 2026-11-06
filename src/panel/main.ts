@@ -443,7 +443,11 @@ function pintarMusica(e: EstadoPanel): void {
     const claro = r.confianza >= 0.6 ? "claro" : r.confianza >= 0.3 ? "regular" : "dudoso";
     const parte = r.pausa ? "en pausa" : `${r.partes} ${r.partes === 1 ? "parte" : "partes"}`;
     const oida = r.energia.toFixed(1).replace(".", ",");
-    ritmo.textContent = `${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · suena con energía ${oida} · ${parte} · paso: ${r.paso}`;
+    const k = e.conocida;
+    const memoria = k
+      ? `La conozco: ${k.escuchas} ${k.escuchas === 1 ? "escucha" : "escuchas"}, ${k.partes} ${k.partes === 1 ? "parte" : "partes"} · `
+      : "Primera vez que la oigo · ";
+    ritmo.textContent = `${memoria}${r.ppm} ppm · ritmo ${claro} (${Math.round(r.confianza * 100)} %) · suena con energía ${oida} · ${parte} · paso: ${r.paso}`;
   }
 }
 

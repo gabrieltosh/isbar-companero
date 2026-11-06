@@ -86,6 +86,15 @@ export const ritmo = {
 export const golpe = crearSenal();
 /** Empieza una parte nueva de la canción (estribillo, puente…). */
 export const parteNueva = crearSenal();
+/** El análisis oyó una parte nueva o la vuelta de la música tras una pausa (aprendizaje.ts las
+ * apunta en el mapa de la canción). */
+export const seccionOida = crearSenal<"cambio" | "vuelta">();
+
+/** Si ya se adelantó a esta parte porque la conocía (aprendizaje.ts): entonces no se repite. */
+let yaPrevista: (tipo: "cambio" | "vuelta") => boolean = () => false;
+export function fijarPrevistas(f: (tipo: "cambio" | "vuelta") => boolean): void {
+  yaPrevista = f;
+}
 
 let ultimoNivel = 0;
 let rapida = 0;
@@ -193,17 +202,12 @@ function procesar(e: EstadoAudio): void {
     if (g) ritmo.presencia[i] += (1 - ritmo.presencia[i]) * 0.35;
   });
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
+  if (e.seccion === "cambio" || e.seccion === "vuelta") seccionOida.emitir(e.seccion);
   if (e.seccion === "cambio") {
-    nuevaParte();
+    if (!yaPrevista("cambio")) nuevaParte();
     parteNueva.emitir();
   }
-  if (e.seccion === "vuelta") {
-    // Vuelve la música: celebra con un latido fuerte y notitas por los dos lados
-    celebrarVuelta();
-    ritmo.latido = 1;
-    sacarNota(ahora, -1);
-    sacarNota(ahora, 1);
-  }
+  if (e.seccion === "vuelta" && !yaPrevista("vuelta")) volvioLaMusica();
 
   // Pulso: entre mensajes avanza solo; con cada uno se acerca a lo que dice Rust. Si la
   // diferencia es grande (cambio de tempo o de compás), salta directamente
@@ -220,6 +224,15 @@ function procesar(e: EstadoAudio): void {
   // intensas, siempre en un golpe y por un lado u otro al azar. Ninguna en una pausa
   if (!ritmo.pausa && ahora >= siguienteNota) sacarNota(ahora, Math.random() < 0.5 ? -1 : 1);
   golpe.emitir();
+}
+
+/** Vuelve la música tras una pausa: celebra con un latido fuerte y notitas por los dos lados. */
+export function volvioLaMusica(): void {
+  celebrarVuelta();
+  ritmo.latido = 1;
+  const ahora = performance.now();
+  sacarNota(ahora, -1);
+  sacarNota(ahora, 1);
 }
 
 /** El latido se apaga poco a poco (llamar en cada fotograma; dt en fotogramas de 60 Hz). */

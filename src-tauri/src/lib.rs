@@ -65,6 +65,7 @@ pub fn run() {
         media::media_previous,
         media::media_seek,
         audio::escuchar_audio,
+        audio::sembrar_tempo,
         sistema::estado_sistema,
         sistema::fijar_volumen,
         sistema::alternar_silencio,

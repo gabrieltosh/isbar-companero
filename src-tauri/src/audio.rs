@@ -14,7 +14,7 @@
 
 use std::ffi::c_void;
 use std::mem::ManuallyDrop;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -76,6 +76,18 @@ static ESCUCHANDO: AtomicBool = AtomicBool::new(false);
 #[tauri::command]
 pub fn escuchar_audio(activo: bool) {
     ESCUCHANDO.store(activo, Ordering::SeqCst);
+}
+
+/// Tempo conocido de la canción que empieza (ms entre pulsos, en los bits de un f32; 0 = ninguno).
+static SEMILLA: AtomicU32 = AtomicU32::new(0);
+
+/// Empieza una canción que ya se ha oído: su tempo (ms entre pulsos), para ir en fase desde el
+/// primer segundo (ver ritmo.rs).
+#[tauri::command]
+pub fn sembrar_tempo(intervalo_ms: f32) {
+    if intervalo_ms.is_finite() && intervalo_ms > 0.0 {
+        SEMILLA.store(intervalo_ms.to_bits(), Ordering::SeqCst);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -488,6 +500,10 @@ pub fn iniciar(app: AppHandle) {
                 thread::sleep(ESPERA);
                 continue;
             };
+            let semilla = SEMILLA.swap(0, Ordering::SeqCst);
+            if semilla != 0 {
+                e.analizador.sembrar(f32::from_bits(semilla));
+            }
             if let Err(error) = e.paso(&mut mono) {
                 eprintln!("audio: {error}");
                 escucha = None;

@@ -12,6 +12,8 @@
 //! - Secciones: un cambio claro en el reparto de graves, medios y agudos es una parte nueva
 //!   (estribillo…); si desaparecen los graves es una pausa, y cuando vuelven, la entrada fuerte.
 //!   Durante la pausa se mide cuánto crece la energía (la subida antes del «drop»).
+//! - Tempo conocido: si la canción ya se oyó antes, se le da su tempo al empezar (`sembrar`): la
+//!   fase se busca desde el primer segundo y ese tempo solo se cambia con pruebas claras.
 //! - Instrumentos: además del golpe general, los golpes de cada banda por separado (bombo,
 //!   caja y platillos), cada uno con su propio umbral, para que el baile sepa qué suena.
 
@@ -50,6 +52,11 @@ const SEPARACION_GOLPE_BANDA: u64 = 10;
 /** Parte mínima de lo que ha subido el sonido que tiene que poner una banda para que su golpe
  * cuente (si no, un ruido de caja con un poco de graves contaría como bombo). */
 const PARTE_GOLPE_BANDA: f32 = 0.1;
+/** Con el tempo conocido: medidas para buscar ya la fase (1 s), cuánto tiempo se protege ese tempo
+ * (6 s) y cuántas revisiones seguidas (3 s) hace falta que otro tempo se repita para cambiarlo. */
+const MINIMO_FASE: usize = 100;
+const SEMILLA_PROTEGIDA: u64 = 600;
+const REPETICIONES_CONTRA_SEMILLA: u32 = 12;
 /** Subida en una pausa: lo que crece la energía (logaritmo, ~6 dB) para contar como subida plena. */
 const SUBIDA_PLENA: f32 = 1.4;
 /// Ventana (medidas) alrededor de cada pulso para medir sus graves.
@@ -230,6 +237,8 @@ pub struct Analizador {
     huellas: VecDeque<[f32; 3]>,
     ultimo_cambio: u64,
     seccion: Option<Seccion>,
+    /** Hasta qué medida se protege el tempo conocido (sembrar) */
+    sembrado_hasta: u64,
 }
 
 impl Analizador {
@@ -277,6 +286,7 @@ impl Analizador {
             huellas: VecDeque::with_capacity(HUELLAS + 1),
             ultimo_cambio: 0,
             seccion: None,
+            sembrado_hasta: 0,
         }
     }
 
@@ -294,6 +304,23 @@ impl Analizador {
                 self.medir();
             }
         }
+    }
+
+    /// Empieza otra canción cuyo tempo ya se conoce (ms entre pulsos): se olvida lo que se oía
+    /// antes y se busca la fase con ese tempo desde el primer segundo.
+    pub fn sembrar(&mut self, intervalo_ms: f32) {
+        let ppm = 60_000.0 / intervalo_ms;
+        if !(PPM_MIN..=PPM_MAX).contains(&ppm) {
+            return;
+        }
+        self.periodo = intervalo_ms / 1000.0 / SALTO;
+        self.con_tempo = true;
+        self.reanclar = true;
+        self.candidato = None;
+        self.flujo.clear();
+        self.graves.clear();
+        self.acentos = [0.0; 4];
+        self.sembrado_hasta = self.medidas + SEMILLA_PROTEGIDA;
     }
 
     /// Estado para el compañero; empieza a contar de nuevo el pico y el golpe.
@@ -363,6 +390,9 @@ impl Analizador {
             self.buscar_cambio();
             if self.flujo.len() >= MINIMO_TEMPO {
                 self.revisar_tempo();
+            }
+            // Con el tempo ya sabido (también si se sembró), la fase se busca antes
+            if self.con_tempo && self.flujo.len() >= MINIMO_FASE {
                 self.revisar_fase();
             }
         }
@@ -528,7 +558,9 @@ impl Analizador {
             // Otro tempo: se cambia solo si se repite durante casi un segundo
             self.candidato = match self.candidato {
                 Some((c, veces)) if (nuevo / c - 1.0).abs() < 0.06 => {
-                    if veces + 1 >= 3 {
+                    // Contra un tempo conocido (sembrado), hace falta que se repita más
+                    let hacen_falta = if self.medidas < self.sembrado_hasta { REPETICIONES_CONTRA_SEMILLA } else { 3 };
+                    if veces + 1 >= hacen_falta {
                         self.periodo = nuevo;
                         self.reanclar = true;
                         None
@@ -803,6 +835,27 @@ mod pruebas {
         assert!(en(12.5) < en(14.9), "la subida crece: {} → {}", en(12.5), en(14.9));
         assert!(en(14.9) > 0.5, "subida al final: {}", en(14.9));
         assert!(en(16.5) == 0.0, "tras el drop, sin subida: {}", en(16.5));
+    }
+
+    #[test]
+    fn tempo_sembrado_desde_el_principio() {
+        // A los 2 s: sin sembrar, el análisis aún no sabe el tempo; sembrado, ya va en fase
+        let ppm = 140.0;
+        let muestras = pista(ppm, 2.0, 0);
+        let sin = analizar(&muestras);
+        assert!((sin.intervalo - 500.0).abs() < 1.0, "sin sembrar aún no sabe el tempo: {}", sin.intervalo);
+        let mut a = Analizador::nuevo(FS);
+        a.sembrar(60_000.0 / ppm);
+        let mut e = a.estado();
+        for trozo in muestras.chunks(480) {
+            a.procesar(trozo);
+            e = a.estado();
+        }
+        let esperado = 60_000.0 / ppm;
+        assert!((e.intervalo / esperado - 1.0).abs() < 0.01, "sembrado: {} ms", e.intervalo);
+        let desfase = e.pulso - muestras.len() as f64 / f64::from(FS) * f64::from(ppm) / 60.0;
+        let fraccion = desfase - desfase.round();
+        assert!(fraccion.abs() < 0.06, "sembrado: desfase de {fraccion} pulsos");
     }
 
     #[test]

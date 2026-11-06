@@ -38,6 +38,8 @@ export interface EstadoPanel {
   } | null;
   /** Ritmo reconocido mientras suena música con audio (para ver cómo va) */
   ritmo: { ppm: number; confianza: number; golpes: number; partes: number; pausa: boolean; paso: string; energia: number } | null;
+  /** Lo que el compañero ha aprendido de la canción que suena (null: es la primera vez que la oye) */
+  conocida: { escuchas: number; partes: number } | null;
   /** El tiempo de ahora en la ciudad de Configuración (null sin ciudad o sin respuesta) */
   clima: {
     temperatura: number;

@@ -33,6 +33,7 @@ import { minutosNoMolestar } from "./noMolestar";
 import { caracterActual, corregirCaracter } from "./caracter";
 import { actividadActual } from "./actividad";
 import { resumenRitmo } from "./ritmo";
+import { conocimientoCancion } from "./aprendizaje";
 import { responder, responderMusica } from "./respuestas";
 
 /** Mientras el panel está abierto, cada cuánto se le manda el estado (relojes, música…). */
@@ -60,6 +61,7 @@ function foto(): EstadoPanel {
     },
     musica: info ? { ...info, posicion: posicionMusica() } : null,
     ritmo: resumenRitmo(),
+    conocida: conocimientoCancion(),
     caracter: caracterActual(),
     clima: resumenClima(),
     noMolestar: minutosNoMolestar(),

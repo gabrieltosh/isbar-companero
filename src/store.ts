@@ -1,16 +1,21 @@
-// Persistencia local con tauri-plugin-store (archivo isla.json en la carpeta de datos de la app)
+// Persistencia local con tauri-plugin-store, en la carpeta de datos de la app. Casi todo va en
+// isla.json; lo que ocupa más (lo aprendido de las canciones) va en su propio archivo.
 import { load, type Store } from "@tauri-apps/plugin-store";
 
-let almacen: Promise<Store> | null = null;
+const almacenes = new Map<string, Promise<Store>>();
 
-function abrir(): Promise<Store> {
-  almacen ??= load("isla.json", { autoSave: 300, defaults: {} });
+function abrir(archivo: string): Promise<Store> {
+  let almacen = almacenes.get(archivo);
+  if (!almacen) {
+    almacen = load(archivo, { autoSave: 300, defaults: {} });
+    almacenes.set(archivo, almacen);
+  }
   return almacen;
 }
 
-export async function leer<T>(clave: string, porDefecto: T): Promise<T> {
+export async function leer<T>(clave: string, porDefecto: T, archivo = "isla.json"): Promise<T> {
   try {
-    const valor = await (await abrir()).get<T>(clave);
+    const valor = await (await abrir(archivo)).get<T>(clave);
     return valor ?? porDefecto;
   } catch (e) {
     console.error("store:", e);
@@ -18,9 +23,9 @@ export async function leer<T>(clave: string, porDefecto: T): Promise<T> {
   }
 }
 
-export async function guardar(clave: string, valor: unknown): Promise<void> {
+export async function guardar(clave: string, valor: unknown, archivo = "isla.json"): Promise<void> {
   try {
-    await (await abrir()).set(clave, valor);
+    await (await abrir(archivo)).set(clave, valor);
   } catch (e) {
     console.error("store:", e);
   }

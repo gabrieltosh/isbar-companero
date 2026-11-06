@@ -32,6 +32,7 @@ import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
 import { caracterActual, iniciarCaracter } from "./caracter";
 import { iniciarCancion } from "./cancion";
+import { iniciarAprendizaje, intensidadQueViene, subidaConocida } from "./aprendizaje";
 import { iniciarActividad, modoActividad } from "./actividad";
 import { dibujarTiempo } from "./tiempo";
 import { iniciarRespuestas } from "./respuestas";
@@ -235,8 +236,11 @@ function fotograma(ahora: number): void {
   if (conRitmo) {
     // Cuánto baila: lo elegido en la configuración y, si estás concentrado, más discreto
     const factor = (FACTOR_BAILE[config.baile] ?? 1) * (modoActividad().tranquilo ? FACTOR_CONCENTRADO : 1);
-    const oido = { presencia: ritmo.presencia, subida: ritmo.subida, energia: ritmo.energiaOida, factor };
-    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa, oido);
+    // Si conoce la canción, se contiene antes del «drop» y elige los pasos con lo que viene
+    const subida = Math.max(ritmo.subida, subidaConocida());
+    const oido = { presencia: ritmo.presencia, subida, energia: ritmo.energiaOida, factor };
+    const intensidad = intensidadQueViene() ?? ritmo.intensidad;
+    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, intensidad, ritmo.intervalo, ritmo.pausa, oido);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
     // Si la canción es triste, los ojos felices se cierran; en una balada también, a gusto
@@ -970,6 +974,7 @@ iniciarPuente();
 iniciarRitmo();
 void iniciarCaracter();
 void iniciarCancion();
+void iniciarAprendizaje();
 iniciarActividad();
 iniciarSistema();
 void iniciarClima();
