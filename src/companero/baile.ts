@@ -120,7 +120,7 @@ const PASOS: Paso[] = [
       const f = b - Math.floor(b);
       const g = golpeDe(b);
       // El salto que cae en el primer tiempo es más alto
-      const alto = Math.sin(f * Math.PI) * (6 + e * 6) * acentoDe(b + 1);
+      const alto = Math.sin(f * Math.PI) * (3.5 + e * 2.5) * acentoDe(b + 1);
       return mov({ y: -alto, sy: 1 - g * 0.12 + (alto / 12) * 0.06, sx: 1 + g * 0.09, saltoCara: g * 1.5 });
     },
   },
@@ -244,7 +244,7 @@ const PASOS: Paso[] = [
     ppm: [110, 999],
     mover: (b, e) => {
       const g = golpeDe(b);
-      const alto = Math.sin(fraccion(b) * Math.PI) * (11 + e * 6) * acentoDe(b + 1);
+      const alto = Math.sin(fraccion(b) * Math.PI) * (5.5 + e * 3.5) * acentoDe(b + 1);
       return mov({ y: -alto, sy: 1 + (alto / 18) * 0.1 - g * 0.15, sx: 1 - (alto / 18) * 0.05 + g * 0.1, saltoCara: g * 2 });
     },
   },
@@ -449,7 +449,7 @@ const CELEBRA: Paso = {
   mover: (b, e) => {
     const f = b - Math.floor(b);
     const g = golpeDe(b);
-    const alto = Math.sin(f * Math.PI) * (10 + e * 6);
+    const alto = Math.sin(f * Math.PI) * (5.5 + e * 3.5);
     const lado = ladoDe(b);
     return mov({ y: -alto, rot: lado * 10 * Math.sin(f * Math.PI), sy: 1 - g * 0.14 + (alto / 16) * 0.08, sx: 1 + g * 0.1, saltoCara: g * 2, miraX: lado * 2 });
   },
@@ -580,9 +580,11 @@ export function fijarCaracterBaile(c: CaracterBaile | null): void {
   if (c && generoPrincipal(c) !== antes) cambiarEnCompas = true;
 }
 
-/** Hasta dónde puede llegar el cuerpo (px): la ventana deja 24 px de margen y encima van notas y extras. */
-const MAX_SUBIDA = 16;
+/** Hasta dónde puede llegar el cuerpo (px) y cuánto puede estirarse: la ventana deja 24 px de
+ * margen y encima van notas y extras (con más, al saltar se salía del marco). */
+const MAX_SUBIDA = 9;
 const MAX_LADO = 12;
+const MAX_ESTIRON = 1.06;
 
 /** Hasta dónde se mueve la cabeza dentro del cuerpo: el salto (px) y la inclinación (grados). Por
  * encima, con la música animada parecía agitarla demasiado. */
@@ -604,7 +606,7 @@ function contenerCabeza(m: Movimiento, vueltaEntera: boolean, factor = 1): Movim
 /** Más grandes o más pequeños los movimientos del cuerpo y la cabeza (no los giros enteros de la
  * cara), sin salirse de la ventana. */
 function ampliar(m: Movimiento, a: number): Movimiento {
-  if (a === 1) return m;
+  // Los topes valen siempre, también con la amplitud normal
   return {
     ...m,
     x: Math.max(-MAX_LADO, Math.min(MAX_LADO, m.x * a)),
@@ -612,7 +614,7 @@ function ampliar(m: Movimiento, a: number): Movimiento {
     rot: m.rot * a,
     saltoCara: m.saltoCara * a,
     sx: 1 + (m.sx - 1) * a,
-    sy: 1 + (m.sy - 1) * a,
+    sy: Math.min(MAX_ESTIRON, 1 + (m.sy - 1) * a),
   };
 }
 

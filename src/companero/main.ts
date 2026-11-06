@@ -79,6 +79,8 @@ const ENERGIA_PUNO = 3.3;
 const ENERGIA_CUERNOS = 2.8;
 /** Concentrado (programando, escribiendo…): baila con tanto de lo normal. */
 const FACTOR_CONCENTRADO = 0.45;
+/** Cuánto se acerca el cuerpo al paso en cada fotograma al bailar (menos, más suave). */
+const SUAVIDAD_BAILE = 0.25;
 
 /** El género que más pesa en la mezcla de Jev, o null. */
 function estiloPrincipal(estilos: Partial<Record<string, number>> | null | undefined): string | null {
@@ -487,10 +489,12 @@ function fotograma(ahora: number): void {
   const colgando = arrastrando || Math.abs(paseo.angulo) > 0.4 || Math.abs(paseo.velAngular) > 0.05;
   companero.style.transformOrigin = colgando ? "50% 12%" : "50% 100%";
 
-  // Baile: el cuerpo sigue el paso (y vuelve suave a su sitio al acabar la música)
+  // Baile: el cuerpo sigue el paso (y vuelve suave a su sitio al acabar la música); con música,
+  // más suave aún, para que los saltos no sean bruscos
+  const suavidad = conRitmo ? SUAVIDAD_BAILE : 0.4;
   for (const c of Object.keys(baile) as (keyof Movimiento)[]) {
     const quieto = c === "sx" || c === "sy" ? 1 : 0;
-    baile[c] = acercar(baile[c], quieto + (objetivoBaile[c] - quieto) * movimiento, 0.4);
+    baile[c] = acercar(baile[c], quieto + (objetivoBaile[c] - quieto) * movimiento, suavidad);
   }
 
   // Respira: más lento de noche, más suave en modo tranquilo
