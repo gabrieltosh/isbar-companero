@@ -141,8 +141,8 @@ const SONRISA_ABIERTA = boca(22, 0, 12);
 
 /** Curva de la boca según el tono (0 muy triste … 4 muy alegre): ancho y bordes de arriba y abajo. */
 const BOCA_POR_TONO: [number, number, number][] = [
-  [14, -5.5, -4], // muy triste: puchero, arco hacia abajo marcado (como la cara triste)
-  [12, -2.4, -1.8], // algo triste o melancólica: claramente caída
+  [14, -5, -5], // muy triste: arco hacia abajo marcado, cerrado (sin hueco)
+  [12, -2.2, -2.2], // algo triste o melancólica: claramente caída, cerrada
   [11.5, 1.8, 2.4], // neutra: sonrisa suave, a gusto (seria se veía enfadado)
   [13, 3.2, 3.8], // alegre: sonrisa
   [16, 5.5, 6.5], // muy alegre: sonrisa amplia
@@ -346,8 +346,9 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
       if (musica.tono !== undefined) {
         const tristeza = limitar((1.5 - musica.tono) / 1.5, 0, 1);
         o = { ...o, giro: o.giro - 14 * tristeza, dy: o.dy + tristeza };
+        // Tiembla la línea entera (los dos bordes a la vez): así la boca no se abre
         const tiembla = Math.sin(t / 70) * 0.5 * limitar((1 - musica.tono) / 1, 0, 1);
-        if (tiembla) b = { ...b, t: b.t + tiembla, b: b.b - tiembla };
+        if (tiembla) b = { ...b, t: b.t + tiembla, b: b.b + tiembla };
       }
       return iguales(o, b);
     }
