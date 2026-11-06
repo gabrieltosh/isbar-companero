@@ -3,7 +3,8 @@
 // la canción. Aquí se lleva el pulso entre mensaje y mensaje (sin saltos), se calculan la
 // energía y la intensidad de esta parte, se sacan las notitas con los golpes y se avisa al
 // baile de las partes nuevas, las pausas y la vuelta de la música. De cada instrumento (bombo,
-// caja, platillos) se lleva su golpe y si está sonando, para que el baile siga lo que suena.
+// caja, platillos) se lleva si está sonando, para que el baile siga lo que suena (no cada golpe:
+// con un arpegio rápido parecería que tiembla).
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cambioCancion, cambiosMusica, musicaSonando } from "../estado/musica";
@@ -70,10 +71,8 @@ export const ritmo = {
   pausa: false,
   /** Energía de graves, medios y agudos (0 a 1) */
   bandas: [0, 0, 0] as [number, number, number],
-  /** Golpe de bombo, caja y platillos: 1 justo en el golpe, baja a 0 enseguida */
-  instrumentos: [0, 0, 0] as [number, number, number],
-  /** Si cada instrumento está sonando: 1 si ha dado un golpe hace poco, baja a 0 en un par de
-   * segundos sin golpes (una parte solo con guitarra no tiene bombo) */
+  /** Si cada instrumento (bombo, caja, platillos) está sonando: sube poco a poco con sus golpes
+   * y baja a 0 en un par de segundos sin ellos (una parte solo con guitarra no tiene bombo) */
   presencia: [0, 0, 0] as [number, number, number],
   /** En una pausa, cuánto ha crecido la música (0 a 1): la subida antes del «drop» */
   subida: 0,
@@ -165,10 +164,9 @@ function procesar(e: EstadoAudio): void {
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
   ritmo.subida += (e.subida - ritmo.subida) * 0.2;
+  // Cada golpe acerca su presencia a 1 (poco a poco: sin saltos cuando empieza a sonar)
   e.golpes.forEach((g, i) => {
-    if (!g) return;
-    ritmo.instrumentos[i] = 1;
-    ritmo.presencia[i] = 1;
+    if (g) ritmo.presencia[i] += (1 - ritmo.presencia[i]) * 0.35;
   });
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
   if (e.seccion === "cambio") {
@@ -203,11 +201,7 @@ function procesar(e: EstadoAudio): void {
 /** El latido se apaga poco a poco (llamar en cada fotograma; dt en fotogramas de 60 Hz). */
 export function apagarLatido(dt: number): void {
   ritmo.latido *= Math.pow(0.86, dt);
-  // Los golpes de cada instrumento se apagan enseguida (los platillos, antes); su presencia, en un
-  // par de segundos
-  ritmo.instrumentos[0] *= Math.pow(0.84, dt);
-  ritmo.instrumentos[1] *= Math.pow(0.82, dt);
-  ritmo.instrumentos[2] *= Math.pow(0.72, dt);
+  // Sin golpes de un instrumento, su presencia se apaga en un par de segundos
   for (let i = 0; i < 3; i++) ritmo.presencia[i] *= Math.pow(0.985, dt);
 }
 

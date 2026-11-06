@@ -220,7 +220,7 @@ function fotograma(ahora: number): void {
   if (conRitmo) {
     // Cuánto baila: lo elegido en la configuración y, si estás concentrado, más discreto
     const factor = (FACTOR_BAILE[config.baile] ?? 1) * (modoActividad().tranquilo ? FACTOR_CONCENTRADO : 1);
-    const oido = { instrumentos: ritmo.instrumentos, presencia: ritmo.presencia, subida: ritmo.subida, factor };
+    const oido = { presencia: ritmo.presencia, subida: ritmo.subida, factor };
     const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa, oido);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;

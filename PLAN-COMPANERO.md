@@ -268,9 +268,10 @@ Cada fase termina con algo que funciona y se puede probar.
   variadas y ocasionales (una cada 2 a 4,5 s, como mucho dos); en fiesta, alguna estrella.
 - **Pasos con calma**: mantiene el paso mientras la canción no cambia; cambia al empezar el compás
   cuando cambia la música, o cada 8 compases (16 si es calmada); transición de unos dos pulsos.
-- **Instrumentos** (`ritmo.rs`): golpes de bombo, caja y platillos por separado. El bombo mueve el
-  cuerpo, la caja la cabeza y los platillos un leve vaivén; si uno no suena, su parte se mueve
-  menos. (El brillo de la cara latiendo con el bombo se probó y se quitó: parecía que temblaba.)
+- **Instrumentos** (`ritmo.rs`): golpes de bombo, caja y platillos por separado. Con bombo el
+  cuerpo rebota más; con caja la cabeza asiente más; si uno no suena, su parte se mueve menos.
+  Siempre con el movimiento del paso, al ritmo del pulso: un empujón por cada golpe suelto se
+  probó y se quitó (con un arpegio rápido, como *Thunderstruck*, parecía que temblaba). (El brillo de la cara latiendo con el bombo se probó y se quitó: parecía que temblaba.)
 - **Subida y drop**: en una pausa se mide cuánto crece la música; se agacha y se contiene (ojos
   apretados al final) y celebra al estallar.
 - **Principio y final**: escucha 2 compases antes de bailar; al terminar una canción entera

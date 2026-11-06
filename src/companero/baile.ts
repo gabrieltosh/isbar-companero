@@ -16,8 +16,9 @@
 // Con las partes de la canción (ritmo.rs): una parte nueva cambia de paso al empezar el
 // compás siguiente; en una pausa se queda esperando (si la música va creciendo, se agacha y se
 // contiene cada vez más), y cuando vuelve la música, celebra. Al empezar una canción, primero la
-// escucha un par de compases. Cada instrumento mueve su parte: el bombo, el cuerpo; la caja, la
-// cabeza; los platillos, un leve vaivén; si uno no suena, su parte se mueve menos.
+// escucha un par de compases. Cada instrumento mueve su parte: con bombo, el cuerpo rebota más;
+// con caja, la cabeza asiente más; si uno no suena, su parte se mueve menos. Siempre al ritmo
+// del pulso, nunca con cada golpe suelto (un arpegio rápido haría que pareciera temblar).
 import type { Estilo } from "../estado/jev";
 import type { OjosBaile } from "./cara";
 
@@ -294,6 +295,8 @@ const PASOS: Paso[] = [
     ojos: "cerrados",
     desde: 0.3,
     hasta: 1,
+    // Rasguea en cada medio pulso: más rápido parecería que tiembla
+    ppm: [0, 120],
     mover: (b, e) => {
       const s = Math.sin((b / 4) * Math.PI * 2);
       const g = golpeDe(b * 2);
@@ -463,8 +466,7 @@ let escucharHasta = 0;
 
 /** Lo que se oye ahora de cada instrumento (ritmo.ts) y cuánto bailar. */
 export interface Oido {
-  /** Golpe de bombo, caja y platillos (1 → 0) y si cada uno está sonando (0 a 1) */
-  instrumentos: readonly [number, number, number];
+  /** Si están sonando bombo, caja y platillos (0 a 1) */
   presencia: readonly [number, number, number];
   /** En una pausa, la subida antes del «drop» (0 a 1) */
   subida: number;
@@ -478,20 +480,18 @@ export function empezarCancion(): void {
   cambiarEnCompas = false;
 }
 
-/** Cada instrumento mueve su parte: el bombo, el cuerpo (rebota y se aplasta); la caja, la
- * cabeza (asiente); los platillos, un leve vaivén de la cabeza. Si uno no está sonando (una parte
- * solo con guitarra no tiene bombo), su parte se mueve menos. */
-function seguirInstrumentos(m: Movimiento, o: Oido, pulso: number): Movimiento {
-  const [bombo, caja, platillo] = o.instrumentos;
+/** Cada instrumento mueve su parte, con el movimiento del paso (al ritmo del pulso): con bombo,
+ * el cuerpo rebota más; con caja, la cabeza asiente más. Si uno no está sonando (una parte solo
+ * con guitarra no tiene bombo), su parte se mueve menos. */
+function seguirInstrumentos(m: Movimiento, o: Oido): Movimiento {
   const cuerpo = 0.55 + 0.45 * o.presencia[0];
   const cabeza = 0.6 + 0.4 * o.presencia[1];
   return {
     ...m,
-    y: m.y * cuerpo + bombo * 1.2,
-    sy: 1 + (m.sy - 1) * cuerpo - bombo * 0.04,
-    sx: 1 + (m.sx - 1) * cuerpo + bombo * 0.025,
-    saltoCara: m.saltoCara * cabeza + caja * 1.2,
-    giroCara: m.giroCara + platillo * 1.5 * ladoDe(pulso * 2),
+    y: m.y * cuerpo,
+    sy: 1 + (m.sy - 1) * cuerpo,
+    sx: 1 + (m.sx - 1) * cuerpo,
+    saltoCara: m.saltoCara * cabeza,
   };
 }
 
@@ -771,7 +771,7 @@ export function bailar(
   let m = k >= 1 || !anterior ? actual.mover(pulso, e) : mezclarMov(anterior.mover(pulso, e), actual.mover(pulso, e), suave(k));
   let ojos = k >= 1 || !anterior || k >= 0.5 ? actual.ojos : anterior.ojos;
   if (oido) {
-    m = seguirInstrumentos(m, oido, pulso);
+    m = seguirInstrumentos(m, oido);
     // En la pausa, si la música va creciendo, se contiene; justo antes del «drop», ojos apretados
     if (actual === ESPERA) {
       m = contenerse(m, oido.subida, ahora);
