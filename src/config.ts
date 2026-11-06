@@ -16,6 +16,8 @@ import {
   POMODORO_POR_DEFECTO,
   SONIDO_POR_DEFECTO,
   TAMANOS_COMPANERO,
+  BAILES_COMPANERO,
+  type BaileCompanero,
   type ConfigAgua,
   type ConfigClima,
   type ConfigCompanero,
@@ -125,6 +127,9 @@ selectorCompanero("#companero-color", COLORES_COMPANERO, grupos.companero.color,
 });
 selectorCompanero("#companero-tamano", TAMANOS_COMPANERO, String(grupos.companero.tamano), (v) => {
   grupos.companero.tamano = Number(v);
+});
+selectorCompanero("#companero-baile", BAILES_COMPANERO, grupos.companero.baile, (v) => {
+  grupos.companero.baile = v as BaileCompanero;
 });
 
 // ---------- Tiempo ----------

@@ -2,10 +2,11 @@
 // propia (vida.ts), reacciona al ratón y se mueve manteniéndolo pulsado.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { COMPANERO_POR_DEFECTO, EVENTO_AJUSTES, type ConfigCompanero } from "../ajustes";
+import { COMPANERO_POR_DEFECTO, EVENTO_AJUSTES, FACTOR_BAILE, type ConfigCompanero } from "../ajustes";
 import { guardar, leer } from "../store";
 import { $ } from "../util";
 import {
+  FIN_APLAUSO,
   bocaMusical,
   bostezo,
   dibujarCara,
@@ -30,6 +31,7 @@ import { SIN_BAILE, bailar, pararBaile, pasoActual, type Movimiento } from "./ba
 import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
 import { caracterActual, iniciarCaracter } from "./caracter";
+import { iniciarCancion } from "./cancion";
 import { iniciarActividad, modoActividad } from "./actividad";
 import { dibujarTiempo } from "./tiempo";
 import { iniciarRespuestas } from "./respuestas";
@@ -73,6 +75,16 @@ const TONO_LAGRIMA = 0.8;
 const TONO_OJOS_FELICES = 1.5;
 const TONO_PUNO = 3;
 const ENERGIA_PUNO = 3.3;
+/** Rock con esta energía, en el estribillo: cuernos en vez de puño (aunque no sea alegre). */
+const ENERGIA_CUERNOS = 2.8;
+/** Concentrado (programando, escribiendo…): baila con tanto de lo normal. */
+const FACTOR_CONCENTRADO = 0.45;
+
+/** El género que más pesa en la mezcla de Jev, o null. */
+function estiloPrincipal(estilos: Partial<Record<string, number>> | null | undefined): string | null {
+  const lista = Object.entries(estilos ?? {}) as [string, number][];
+  return lista.length ? lista.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : null;
+}
 const ESTRIBILLO = 0.7;
 /** Teclado activo con el ratón quieto este tiempo = se está escribiendo. */
 const ESCRIBIENDO_MS = 2500;
@@ -206,12 +218,24 @@ function fotograma(ahora: number): void {
   let objetivoBaile = SIN_BAILE;
   let ojosObjetivo: OjosBaile = "felices";
   if (conRitmo) {
-    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa);
+    // Cuánto baila: lo elegido en la configuración y, si estás concentrado, más discreto
+    const factor = (FACTOR_BAILE[config.baile] ?? 1) * (modoActividad().tranquilo ? FACTOR_CONCENTRADO : 1);
+    const oido = { instrumentos: ritmo.instrumentos, presencia: ritmo.presencia, subida: ritmo.subida, factor };
+    const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa, oido);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
-    // Si la canción es triste, los ojos felices se cierran
-    const tonoJev = caracterActual()?.tono;
-    if (tonoJev != null && tonoJev < TONO_OJOS_FELICES && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
+    // Si la canción es triste, los ojos felices se cierran; en una balada también, a gusto
+    const jev = caracterActual();
+    const triste = jev?.tono != null && jev.tono < TONO_OJOS_FELICES;
+    if ((triste || estiloPrincipal(jev?.estilos) === "balada") && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
+  } else if (expresion === "aplaude") {
+    // Aplaude dando saltitos y al final hace una reverencia (se inclina hacia delante)
+    if (progreso < FIN_APLAUSO) {
+      objetivoBaile = { ...SIN_BAILE, y: -Math.abs(Math.sin(ahora / 95)) * 1.5 };
+    } else {
+      const k = Math.sin(((progreso - FIN_APLAUSO) / (1 - FIN_APLAUSO)) * Math.PI);
+      objetivoBaile = { ...SIN_BAILE, y: k * 3, sy: 1 - k * 0.08, sx: 1 + k * 0.03, saltoCara: k * 4 };
+    }
   } else if (expresion === "asiente") {
     // El cuerpo acompaña el sí
     objetivoBaile = { ...SIN_BAILE, y: Math.max(0, Math.sin(progreso * Math.PI * 6)) * 1.5 * (1 - progreso) };
@@ -245,14 +269,15 @@ function fotograma(ahora: number): void {
   const momento = !conRitmo ? null : ritmo.pausa ? "pausa" : pasoActual() === "celebra" ? "celebra" : null;
   const bocaObjetivo = bocaMusical({ tono: caracterJev?.tono, estilos: caracterJev?.estilos, intensidad: ritmo.intensidad, momento });
   for (const c of Object.keys(bocaBaile) as (keyof Boca)[]) bocaBaile[c] = acercar(bocaBaile[c], bocaObjetivo[c], 0.06);
-  // Puño en alto con cada pulso: canción muy alegre e intensa, en su parte más fuerte
+  // En la parte más fuerte: cuernos con una canción de rock con energía, o puño en alto con una
+  // muy alegre e intensa; con su golpe en cada pulso
+  const estilo = estiloPrincipal(caracterJev?.estilos);
+  const fuerte = conRitmo && !ritmo.pausa && ritmo.intensidad > ESTRIBILLO;
+  const golpeMano = Math.exp(-(pulsoAhora() % 1) * 5);
+  const cuernos = fuerte && estilo === "rock" && (caracterJev?.energia ?? 0) > ENERGIA_CUERNOS ? golpeMano : undefined;
   const puno =
-    conRitmo &&
-    !ritmo.pausa &&
-    (caracterJev?.tono ?? 0) > TONO_PUNO &&
-    (caracterJev?.energia ?? 0) > ENERGIA_PUNO &&
-    ritmo.intensidad > ESTRIBILLO
-      ? Math.exp(-(pulsoAhora() % 1) * 5)
+    fuerte && cuernos === undefined && (caracterJev?.tono ?? 0) > TONO_PUNO && (caracterJev?.energia ?? 0) > ENERGIA_PUNO
+      ? golpeMano
       : undefined;
   pose.musica =
     expresion === "musica"
@@ -266,6 +291,9 @@ function fotograma(ahora: number): void {
           tono: caracterJev?.tono ?? undefined,
           lagrima: (caracterJev?.tono ?? 4) < TONO_LAGRIMA,
           puno,
+          cuernos,
+          estilo: estilo ?? undefined,
+          brillo: conRitmo ? ritmo.instrumentos[0] : 0,
         }
       : undefined;
 
@@ -409,6 +437,10 @@ function fotograma(ahora: number): void {
       break;
     case "preocupado":
       giro += Math.sin(ahora / 30) * 1.5;
+      break;
+    case "aplaude":
+      // En la reverencia, la cabeza baja con el cuerpo
+      salto = objetivoBaile.saltoCara * movimiento;
       break;
   }
   // El giro va por el camino corto: tras una vuelta entera (360°) no se deshace hacia atrás
@@ -919,6 +951,7 @@ iniciarAvisos();
 iniciarPuente();
 iniciarRitmo();
 void iniciarCaracter();
+void iniciarCancion();
 iniciarActividad();
 iniciarSistema();
 void iniciarClima();

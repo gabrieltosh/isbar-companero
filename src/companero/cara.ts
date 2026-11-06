@@ -37,7 +37,9 @@ export type Expresion =
   | "frustrado"
   | "impresionado"
   /** Sin internet: mira hacia su antena buscando señal */
-  | "buscasenal";
+  | "buscasenal"
+  /** Termina una canción: aplaude y hace una reverencia */
+  | "aplaude";
 
 /** Un ojo: ancho, altura de la curva de arriba y de abajo (negativa = sube: "^"), giro y posición. */
 export interface Ojo {
@@ -89,6 +91,12 @@ export interface MusicaPose {
   lagrima?: boolean;
   /** Puño en alto, con su golpe en cada pulso (1 → 0), o nada */
   puno?: number;
+  /** Cuernos de rock (la mano con dos dedos arriba), con su golpe en cada pulso, o nada */
+  cuernos?: number;
+  /** Género principal de la canción (Jev), si se sabe: en las de fiesta salen estrellas */
+  estilo?: string;
+  /** Golpe del bombo (1 → 0): el brillo de la cara late con él */
+  brillo?: number;
 }
 
 /** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
@@ -276,6 +284,9 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
     case "buscasenal":
       // Ojos muy abiertos mirando hacia la antena y boquita concentrada, de lado
       return iguales(ojo(10.4, 5, 3), boca(6, -1.6, 2.2, 0, 1.5, 3));
+    case "aplaude":
+      // Contento mientras aplaude; en la reverencia del final, ojos cerrados
+      return iguales(progreso > FIN_APLAUSO ? OJO_CERRADO : OJO_FELIZ, SONRISA);
     case "otea":
       // Mano de visera y ojos entornados, como quien mira a lo lejos
       return iguales(ojo(10, 1.8, 4, 0, 0, 1), boca(8, -1.6, 1.6, 0, 0, 3));
@@ -376,20 +387,23 @@ function contorno(w: number, arriba: number, abajo: number): string {
 }
 
 /** Forma rellena con trazo grueso y brillo (el trazo hace que una forma plana se vea como una línea). */
-function forma(d: string, x: number, y: number, giro: number, c: string): string {
+/** Una pieza de la cara (ojo o boca) con su brillo suave alrededor; `pulso` (0 a 1) lo aviva. */
+function forma(d: string, x: number, y: number, giro: number, c: string, pulso = 0): string {
   const pieza = `<path d="${d}" fill="${c}" stroke="${c}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
-  const brillo = `<path d="${d}" fill="none" stroke="${c}" stroke-opacity=".2" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const brillo = `<path d="${d}" fill="none" stroke="${c}" stroke-opacity="${n(0.2 + pulso * 0.22)}" stroke-width="${n(9 + pulso * 2)}" stroke-linejoin="round" stroke-linecap="round"/>`;
   return `<g transform="translate(${n(x)} ${n(y)}) rotate(${n(giro)})">${brillo}${pieza}</g>`;
 }
 
 /** Dibuja ojos y boca a partir de los rasgos y la pose. */
 export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
   const cierre = limitar(p.parpadeo, 0, 1) * 0.9;
+  // Con música, el brillo de la cara late con el bombo
+  const pulso = limitar(p.musica?.brillo ?? 0, 0, 1);
   const parpadear = (o: Ojo): Ojo => ({ ...o, t: o.t + (Math.min(o.t, 0.6) - o.t) * cierre, b: o.b + (Math.min(o.b, 0.6) - o.b) * cierre });
   const pintarOjo = (o: Ojo, base: { x: number; y: number }) => {
     const q = parpadear(o);
     // Las curvas: hacia arriba la de arriba (negativa en SVG), hacia abajo la de abajo
-    return forma(contorno(q.w, -q.t, q.b), base.x + q.dx + p.miraX, base.y + q.dy + p.miraY + p.salto, q.giro, c);
+    return forma(contorno(q.w, -q.t, q.b), base.x + q.dx + p.miraX, base.y + q.dy + p.miraY + p.salto, q.giro, c, pulso);
   };
   const bo = r.boca;
   const boca = forma(
@@ -398,6 +412,7 @@ export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
     BOCA.y + bo.dy + p.miraY * 0.4 + p.salto,
     bo.giro,
     c,
+    pulso,
   );
   return `<g transform="rotate(${n(p.giro)} 32 32)">${pintarOjo(r.izq, OJO_IZQ)}${pintarOjo(r.der, OJO_DER)}${boca}</g>`;
 }
@@ -436,12 +451,14 @@ const nota = (x: number, y: number, k: number, c: string) =>
 
 /** Lo que sale con la música: notas de tres formas o, en una canción de amor, corazones (rotos
  * si además es triste: desamor). */
-type Particula = "negra" | "corchea" | "doble" | "corazon" | "roto";
+type Particula = "negra" | "corchea" | "doble" | "corazon" | "roto" | "estrella";
 /** Desde esta probabilidad (Jev) se trata como canción de amor; por debajo de este tono, desamor. */
 const AMOR = 0.6;
 const TONO_DESAMOR = 1.5;
 
-function formaParticula(variante: number, amor = 0, tono = 2): Particula {
+function formaParticula(variante: number, amor = 0, tono = 2, estilo?: string): Particula {
+  // Fiesta: de vez en cuando, una estrella entre las notas
+  if (estilo === "fiesta" && variante > 0.72) return "estrella";
   if (amor >= AMOR) {
     if (tono < TONO_DESAMOR) return variante < 0.45 ? "roto" : "negra";
     return variante < 0.7 ? "corazon" : variante < 0.85 ? "corchea" : "doble";
@@ -479,7 +496,37 @@ function dibujoParticula(forma: Particula, k: number, c: string): string {
         `<path d="${CORAZON_DER}" ${conBorde(c)} transform="translate(${n(s)} 0) rotate(${n(g)} 1.5 -0.5)"/>`
       );
     }
+    case "estrella":
+      return estrella(1.5, -4, 0.6, c);
   }
+}
+
+/** Parte de «aplaude» que dura el aplauso; después, la reverencia. */
+export const FIN_APLAUSO = 0.65;
+
+/** Palmas que chocan delante del cuerpo, con un destello cuando se juntan. */
+function aplauso(t: number, c: string): string {
+  // Abajo, delante del cuerpo (sin tapar la boca); el destello, entre la boca y las palmas
+  const juntas = Math.abs(Math.sin(t / 95));
+  const separacion = 11 - juntas * 6.5;
+  const destello = juntas > 0.9 ? estrella(32, 53, 0.3 + (juntas - 0.9) * 2, c) : "";
+  return `<circle cx="${n(32 - separacion)}" cy="61" r="4.4" ${conBorde(c)}/><circle cx="${n(32 + separacion)}" cy="61" r="4.4" ${conBorde(c)}/>` + destello;
+}
+
+/** Cuernos de rock: la mano (un círculo, como las otras manitas) con dos dedos arriba, junto a
+ * la cabeza; sube con cada pulso (golpe de 1 a 0). */
+function cuernos(golpe: number | undefined, c: string): string {
+  if (golpe === undefined) return "";
+  const y = 6 - golpe * 5;
+  const dedo = (x0: number, x1: number) => {
+    const d = `M${x0} ${n(y - 2.4)}L${x1} ${n(y - 8)}`;
+    return (
+      `<path d="${d}" stroke="${BORDE}" stroke-width="${n(2.3 + GROSOR_BORDE * 2)}" stroke-linecap="round"/>` +
+      `<path d="${d}" stroke="${c}" stroke-width="2.3" stroke-linecap="round"/>`
+    );
+  };
+  // Los dos dedos abiertos en V (si fueran rectos, parecerían orejas de conejo)
+  return dedo(65.6, 62.2) + dedo(70.4, 73.8) + `<circle cx="68" cy="${n(y)}" r="4.4" ${conBorde(c)}/>`;
 }
 
 /** Una notita (o corazón) que sube meciéndose, con un pequeño «pop» al salir, y se desvanece. */
@@ -528,6 +575,8 @@ export function pelota(t: number): { x: number; y: number; altura: number } {
 /** Lo que acompaña a una expresión y no forma parte de los ojos ni la boca. */
 export function dibujarExtras(expresion: Expresion, t: number, progreso: number, p: Pose, c: string): string {
   switch (expresion) {
+    case "aplaude":
+      return progreso > FIN_APLAUSO ? "" : aplauso(t, c);
     case "mareado":
       return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)">${espiral(OJO_IZQ.x + p.miraX, OJO_IZQ.y + p.miraY, t / 65, c)}${espiral(OJO_DER.x + p.miraX, OJO_DER.y + p.miraY, t / 65, c)}</g>`;
     case "celebra": {
@@ -636,12 +685,12 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     case "musica":
       if (p.musica) {
         // Notitas (o corazones) que salen con los golpes de la canción, cada una a su manera
-        const { amor, tono } = p.musica;
+        const { amor, tono, estilo } = p.musica;
         const notas = p.musica.notas
           .filter((nt) => t >= nt.nace && t < nt.nace + nt.vida)
-          .map((nt) => particula(nt, t, c, formaParticula(nt.variante, amor, tono)))
+          .map((nt) => particula(nt, t, c, formaParticula(nt.variante, amor, tono, estilo)))
           .join("");
-        return notas + lagrima(t, p, c) + puno(p.musica.puno, c);
+        return notas + lagrima(t, p, c) + puno(p.musica.puno, c) + cuernos(p.musica.cuernos, c);
       }
       return nota(58, 30, (t % 1800) / 1800, c) + nota(-4, 26, ((t + 900) % 1800) / 1800, c);
     case "silba":

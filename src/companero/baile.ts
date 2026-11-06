@@ -14,7 +14,10 @@
 // tenga energía (rock triste: encendedor, cabeceo lento, guitarra, cabeceo). Sin Jev, o si duda,
 // se elige solo por la intensidad y el tempo.
 // Con las partes de la canción (ritmo.rs): una parte nueva cambia de paso al empezar el
-// compás siguiente; en una pausa se queda esperando, y cuando vuelve la música, celebra.
+// compás siguiente; en una pausa se queda esperando (si la música va creciendo, se agacha y se
+// contiene cada vez más), y cuando vuelve la música, celebra. Al empezar una canción, primero la
+// escucha un par de compases. Cada instrumento mueve su parte: el bombo, el cuerpo; la caja, la
+// cabeza; los platillos, un leve vaivén; si uno no suena, su parte se mueve menos.
 import type { Estilo } from "../estado/jev";
 import type { OjosBaile } from "./cara";
 
@@ -418,6 +421,21 @@ const ESPERA: Paso = {
   },
 };
 
+/** Al empezar una canción: la escucha un momento, atento, asintiendo un poco con cada pulso. */
+const ESCUCHA: Paso = {
+  nombre: "escucha",
+  estilos: [],
+  ojos: "abiertos",
+  desde: 0,
+  hasta: 0,
+  mover: (b) => {
+    const s = Math.sin((b / 4) * Math.PI);
+    return mov({ saltoCara: golpeDe(b) * 1.4, giroCara: 4 + s * 2, miraX: 1.5 + s, rot: s * 1.5 });
+  },
+};
+/** Compases que escucha una canción antes de soltarse a bailar. */
+const COMPASES_ESCUCHA = 2;
+
 /** Cuando vuelve la música tras una pausa: un compás de saltos grandes, de lado a lado. */
 const CELEBRA: Paso = {
   nombre: "celebra",
@@ -440,6 +458,55 @@ let cambio = 0;
 /** Si ya está bailando (si no, el primer paso se elige enseguida) y en qué pulso empezó el paso. */
 let empezado = false;
 let desdePulso = 0;
+/** Hasta qué pulso escucha la canción antes de bailar. */
+let escucharHasta = 0;
+
+/** Lo que se oye ahora de cada instrumento (ritmo.ts) y cuánto bailar. */
+export interface Oido {
+  /** Golpe de bombo, caja y platillos (1 → 0) y si cada uno está sonando (0 a 1) */
+  instrumentos: readonly [number, number, number];
+  presencia: readonly [number, number, number];
+  /** En una pausa, la subida antes del «drop» (0 a 1) */
+  subida: number;
+  /** Cuánto se mueve: por la configuración y por lo que hace el usuario (1, normal) */
+  factor: number;
+}
+
+/** Empieza otra canción: la escuchará un momento antes de bailar. */
+export function empezarCancion(): void {
+  empezado = false;
+  cambiarEnCompas = false;
+}
+
+/** Cada instrumento mueve su parte: el bombo, el cuerpo (rebota y se aplasta); la caja, la
+ * cabeza (asiente); los platillos, un leve vaivén de la cabeza. Si uno no está sonando (una parte
+ * solo con guitarra no tiene bombo), su parte se mueve menos. */
+function seguirInstrumentos(m: Movimiento, o: Oido, pulso: number): Movimiento {
+  const [bombo, caja, platillo] = o.instrumentos;
+  const cuerpo = 0.55 + 0.45 * o.presencia[0];
+  const cabeza = 0.6 + 0.4 * o.presencia[1];
+  return {
+    ...m,
+    y: m.y * cuerpo + bombo * 1.2,
+    sy: 1 + (m.sy - 1) * cuerpo - bombo * 0.04,
+    sx: 1 + (m.sx - 1) * cuerpo + bombo * 0.025,
+    saltoCara: m.saltoCara * cabeza + caja * 1.2,
+    giroCara: m.giroCara + platillo * 1.5 * ladoDe(pulso * 2),
+  };
+}
+
+/** Subida antes del «drop»: se agacha y se contiene cada vez más, temblando un poco. */
+function contenerse(m: Movimiento, subida: number, ahora: number): Movimiento {
+  if (subida < 0.02) return m;
+  return {
+    ...m,
+    y: m.y + subida * 3,
+    sy: m.sy * (1 - subida * 0.09),
+    sx: m.sx * (1 + subida * 0.05),
+    x: m.x + Math.sin(ahora / 35) * subida * 0.7,
+    saltoCara: m.saltoCara + subida * 1.5,
+  };
+}
 let compas = -1;
 const recientes: string[] = [];
 /** Parte nueva: cambiar de paso al empezar el compás siguiente. */
@@ -523,12 +590,14 @@ const MAX_SALTO_CARA = 3.5;
 const MAX_GIRO_CARA = 10;
 const limitar = (v: number, max: number) => Math.max(-max, Math.min(max, v));
 
-/** La cabeza, dentro de sus límites. El remolino gira la cara entera a propósito: su giro no se toca. */
-function contenerCabeza(m: Movimiento, vueltaEntera: boolean): Movimiento {
+/** La cabeza, dentro de sus límites (algo más o menos según cuánto baila). El remolino gira la
+ * cara entera a propósito: su giro no se toca. */
+function contenerCabeza(m: Movimiento, vueltaEntera: boolean, factor = 1): Movimiento {
+  const escala = Math.max(0.5, Math.min(1.3, factor));
   return {
     ...m,
-    saltoCara: limitar(m.saltoCara, MAX_SALTO_CARA),
-    giroCara: vueltaEntera ? m.giroCara : limitar(m.giroCara, MAX_GIRO_CARA),
+    saltoCara: limitar(m.saltoCara, MAX_SALTO_CARA * escala),
+    giroCara: vueltaEntera ? m.giroCara : limitar(m.giroCara, MAX_GIRO_CARA * escala),
   };
 }
 
@@ -634,7 +703,8 @@ function animacion(intensidad: number, intervalo: number): number {
 }
 
 /** Cómo baila ahora: movimiento del cuerpo y de la cara, y los ojos del paso. `intervalo`: ms
- * entre pulsos; `pausa`: la canción está en una pausa. */
+ * entre pulsos; `pausa`: la canción está en una pausa; `oido`: lo que suena de cada instrumento
+ * (sin él, como al bailar solo sin música, no escucha antes ni sigue instrumentos). */
 export function bailar(
   ahora: number,
   pulso: number,
@@ -642,6 +712,7 @@ export function bailar(
   intensidad: number,
   intervalo: number,
   pausa = false,
+  oido?: Oido,
 ): { mov: Movimiento; ojos: OjosBaile } {
   // Medio tiempo: si Jev dice que la canción es calmada pero el ritmo medido es rápido (pasa a
   // menudo en directos y baladas con mucha percusión), se baila a la mitad
@@ -675,7 +746,14 @@ export function bailar(
     cambiarA(CELEBRA, ahora);
   } else if (actual === CELEBRA && pulso < celebrarHasta) {
     // Sigue celebrando
-  } else if (!empezado || actual === ESPERA || actual === CELEBRA || toca) {
+  } else if (!empezado && oido) {
+    // Empieza la canción: primero la escucha un par de compases
+    cambiarA(ESCUCHA, ahora);
+    empezado = true;
+    escucharHasta = (c + COMPASES_ESCUCHA) * 4;
+  } else if (actual === ESCUCHA && pulso < escucharHasta) {
+    // Sigue escuchando
+  } else if (!empezado || actual === ESCUCHA || actual === ESPERA || actual === CELEBRA || toca) {
     // Al empezar, al acabar una pausa o una celebración (después, un paso animado), y cuando toca
     cambiarA(elegir(actual === CELEBRA ? 1 : animado, 60_000 / intervalo), ahora);
     empezado = true;
@@ -685,14 +763,22 @@ export function bailar(
   }
   const e = Math.max(0, Math.min(1, energia));
   // En el estribillo (parte intensa) se mueve más; en las estrofas, algo menos
-  const amplitud = amplitudBaile() * (0.85 + 0.3 * Math.max(0, Math.min(1, intensidad)));
-  const m = actual.mover(pulso, e);
+  const factor = oido?.factor ?? 1;
+  const amplitud = amplitudBaile() * (0.85 + 0.3 * Math.max(0, Math.min(1, intensidad))) * factor;
   const mezclaMs = Math.max(MEZCLA_MIN_MS, Math.min(MEZCLA_MAX_MS, intervalo * 2));
   const k = anterior ? Math.min(1, (ahora - cambio) / mezclaMs) : 1;
   const vuelta = actual.nombre === "remolino" || (k < 1 && anterior?.nombre === "remolino");
-  if (k >= 1 || !anterior) return { mov: contenerCabeza(ampliar(m, amplitud), vuelta), ojos: actual.ojos };
-  const mezcla = ampliar(mezclarMov(anterior.mover(pulso, e), m, suave(k)), amplitud);
-  return { mov: contenerCabeza(mezcla, vuelta), ojos: k < 0.5 ? anterior.ojos : actual.ojos };
+  let m = k >= 1 || !anterior ? actual.mover(pulso, e) : mezclarMov(anterior.mover(pulso, e), actual.mover(pulso, e), suave(k));
+  let ojos = k >= 1 || !anterior || k >= 0.5 ? actual.ojos : anterior.ojos;
+  if (oido) {
+    m = seguirInstrumentos(m, oido, pulso);
+    // En la pausa, si la música va creciendo, se contiene; justo antes del «drop», ojos apretados
+    if (actual === ESPERA) {
+      m = contenerse(m, oido.subida, ahora);
+      if (oido.subida > 0.5) ojos = "apretados";
+    }
+  }
+  return { mov: contenerCabeza(ampliar(m, amplitud), vuelta, factor), ojos };
 }
 
 /** Nombre del paso que está bailando (para verlo en el panel). */

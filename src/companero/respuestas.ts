@@ -33,8 +33,17 @@ export function responder(r: Respuesta): void {
   gesto(...elegido);
 }
 
+/** Cuándo se tocaron por última vez sus controles de música (cancion.ts no reacciona otra vez). */
+let ultimaAccionMusica = -Infinity;
+
+/** ¿Acaba de tocar alguien sus controles de música? */
+export function accionMusicaReciente(): boolean {
+  return performance.now() - ultimaAccionMusica < 2500;
+}
+
 /** Al tocar los controles de música: reproducir (sí), pausar (no sé), saltar canción (esa no), volver (sí). */
 export function responderMusica(accion: string): void {
+  ultimaAccionMusica = performance.now();
   if (accion === "play") responder(musicaSonando() ? "nose" : "si");
   if (accion === "siguiente") responder("no");
   if (accion === "anterior") responder("si");

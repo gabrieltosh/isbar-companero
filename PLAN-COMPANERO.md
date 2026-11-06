@@ -255,8 +255,32 @@ Cada fase termina con algo que funciona y se puede probar.
 - Rutinas nuevas (pelota, bailar solo, estirarse a los lados) y doble clic variado.
 - Gestos de sí, no y no sé al interactuar (borrar avisos, música, Pomodoro, pausas).
 - Menos fotogramas dormido o cansado; la cara solo se redibuja si cambia.
-- Siete pasos de baile más (catorce en total), elección ponderada y según el tempo; canta a ratos.
+- Siete pasos de baile más (catorce en total), elección ponderada y según el tempo.
 - Opacidad del cuerpo en Configuración (sólido por defecto).
+
+### Baile que escucha (noviembre 2026)
+- **Cabeza calmada**: el golpe sube en un instante (sin tirón), con tope de salto (3,5 px) e
+  inclinación (10°) y suavizado.
+- **Cara según la canción, sin cantar**: boca cerrada que decide el tono (de puchero con el labio
+  temblando a sonrisa amplia; neutra, sonrisa suave) con el toque del género; ojos cerrados en
+  canciones tristes y baladas; lágrimas redondas.
+- **Amor** (pregunta de Jev en la misma consulta): corazones; desamor, corazones rotos. Notitas
+  variadas y ocasionales (una cada 2 a 4,5 s, como mucho dos); en fiesta, alguna estrella.
+- **Pasos con calma**: mantiene el paso mientras la canción no cambia; cambia al empezar el compás
+  cuando cambia la música, o cada 8 compases (16 si es calmada); transición de unos dos pulsos.
+- **Instrumentos** (`ritmo.rs`): golpes de bombo, caja y platillos por separado. El bombo mueve el
+  cuerpo, la caja la cabeza y los platillos un leve vaivén; si uno no suena, su parte se mueve
+  menos. El brillo de la cara late con el bombo.
+- **Subida y drop**: en una pausa se mide cuánto crece la música; se agacha y se contiene (ojos
+  apretados al final) y celebra al estallar.
+- **Principio y final**: escucha 2 compases antes de bailar; al terminar una canción entera
+  aplaude y hace una reverencia; si la saltas, se encoge de hombros; si la pausas, te mira con
+  curiosidad; al seguir, se alegra (`cancion.ts`).
+- **Favoritas**: cuenta las veces que suena cada canción (30 s cuentan); desde 5, «¡Esta me
+  encanta!» una vez al día.
+- **Según lo que haces**: concentrado, baila discreto; en reuniones, vídeos y juegos no baila.
+  Ajuste «Baile» en Configuración: discreto, normal o fiestero.
+- **Rock**: cuernos 🤘 en las partes fuertes con energía.
 
 ## Mejorar el reconocimiento de la música
 

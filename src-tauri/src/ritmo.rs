@@ -11,6 +11,9 @@
 //! - Compás: el primer tiempo es el pulso de cada cuatro con más graves.
 //! - Secciones: un cambio claro en el reparto de graves, medios y agudos es una parte nueva
 //!   (estribillo…); si desaparecen los graves es una pausa, y cuando vuelven, la entrada fuerte.
+//!   Durante la pausa se mide cuánto crece la energía (la subida antes del «drop»).
+//! - Instrumentos: además del golpe general, los golpes de cada banda por separado (bombo,
+//!   caja y platillos), cada uno con su propio umbral, para que el baile sepa qué suena.
 
 use std::collections::VecDeque;
 use std::f64::consts::{FRAC_1_SQRT_2, TAU};
@@ -40,6 +43,15 @@ const RANGO_BANDA: f32 = 4.6;
 /// Un golpe: el flujo supera lo normal en tantas desviaciones, y como mínimo esto.
 const DESVIACIONES_GOLPE: f32 = 1.5;
 const MINIMO_GOLPE: f32 = 0.5;
+/** Golpe de un instrumento (una banda): el flujo de su banda, como mínimo esto, y como mínimo
+ * estas medidas entre dos (los platillos pueden ir a semicorcheas: 100 ms). */
+const MINIMO_GOLPE_BANDA: f32 = 0.6;
+const SEPARACION_GOLPE_BANDA: u64 = 10;
+/** Parte mínima de lo que ha subido el sonido que tiene que poner una banda para que su golpe
+ * cuente (si no, un ruido de caja con un poco de graves contaría como bombo). */
+const PARTE_GOLPE_BANDA: f32 = 0.1;
+/** Subida en una pausa: lo que crece la energía (logaritmo, ~6 dB) para contar como subida plena. */
+const SUBIDA_PLENA: f32 = 1.4;
 /// Ventana (medidas) alrededor de cada pulso para medir sus graves.
 const VENTANA_ACENTO: usize = 3;
 /// Lo que tarda un golpe en notarse en el flujo (medidas): el pulso se adelanta esto.
@@ -94,8 +106,14 @@ pub struct Estado {
     pub pulso: f64,
     /// Qué claro está el ritmo (0 a 1)
     pub confianza: f32,
+    /// Golpes de cada instrumento desde el último estado: bombo (graves), caja (medios) y
+    /// platillos (agudos)
+    pub golpes: [bool; 3],
     /// La canción está en una pausa (sin graves)
     pub pausa: bool,
+    /// En la pausa, cuánto ha crecido la energía desde que empezó (0 a 1): la subida antes del
+    /// «drop». Fuera de una pausa, 0
+    pub subida: f32,
     /// Momento de la canción desde el último estado, si lo hubo
     pub seccion: Option<Seccion>,
 }
@@ -137,6 +155,33 @@ impl Filtro {
     }
 }
 
+/// Busca golpes en un flujo: un máximo claramente por encima de lo normal en esta canción.
+#[derive(Default)]
+struct Detector {
+    media: f32,
+    varianza: f32,
+    previo: f32,
+    antes_previo: f32,
+    ultimo: u64,
+}
+
+impl Detector {
+    /// Mira la medida `medida` (flujo `flujo`); true si la anterior fue un golpe.
+    fn mirar(&mut self, flujo: f32, medida: u64, minimo: f32, separacion: u64) -> bool {
+        let umbral = (self.media + self.varianza.sqrt() * DESVIACIONES_GOLPE).max(minimo);
+        let cresta = self.previo > umbral && self.previo >= self.antes_previo && self.previo > flujo;
+        let golpe = cresta && medida - self.ultimo >= separacion;
+        if golpe {
+            self.ultimo = medida;
+        }
+        self.media += (flujo - self.media) * 0.01;
+        self.varianza += ((flujo - self.media).powi(2) - self.varianza) * 0.01;
+        self.antes_previo = self.previo;
+        self.previo = flujo;
+        golpe
+    }
+}
+
 pub struct Analizador {
     muestras_salto: usize,
     /// Graves (bombo, bajo: < 150 Hz), medios (caja, voz: 300–2500 Hz) y agudos (> 5 kHz)
@@ -164,12 +209,11 @@ pub struct Analizador {
     /// Graves de cada pulso del compás, y cuál de los cuatro es el primero
     acentos: [f32; 4],
     primero: usize,
-    media: f32,
-    varianza: f32,
-    previo: f32,
-    antes_previo: f32,
-    ultimo_golpe: u64,
+    /// Golpe general y de cada instrumento (desde el último estado)
+    detector: Detector,
+    detectores: [Detector; 3],
     golpe: bool,
+    golpes: [bool; 3],
     pico: f32,
     /// Energía media reciente (total, y de cada banda) y la referencia de los graves en esta
     /// canción (en logaritmo). Se promedia la energía y no su logaritmo: así cuentan los golpes
@@ -180,6 +224,9 @@ pub struct Analizador {
     pausa_desde: u64,
     bajo_desde: Option<u64>,
     minimo_pausa: f32,
+    /// Energía total (logaritmo) al empezar la pausa y la subida desde entonces (0 a 1)
+    total_pausa: f32,
+    subida: f32,
     huellas: VecDeque<[f32; 3]>,
     ultimo_cambio: u64,
     seccion: Option<Seccion>,
@@ -213,12 +260,10 @@ impl Analizador {
             fase: 0.0,
             acentos: [0.0; 4],
             primero: 0,
-            media: 0.0,
-            varianza: 0.0,
-            previo: 0.0,
-            antes_previo: 0.0,
-            ultimo_golpe: 0,
+            detector: Detector::default(),
+            detectores: Default::default(),
             golpe: false,
+            golpes: [false; 3],
             pico: 0.0,
             corta_total: 0.0,
             corta: [0.0; 3],
@@ -227,6 +272,8 @@ impl Analizador {
             pausa_desde: 0,
             bajo_desde: None,
             minimo_pausa: 0.0,
+            total_pausa: 0.0,
+            subida: 0.0,
             huellas: VecDeque::with_capacity(HUELLAS + 1),
             ultimo_cambio: 0,
             seccion: None,
@@ -260,11 +307,14 @@ impl Analizador {
             intervalo: self.periodo * SALTO * 1000.0,
             pulso: self.fase - self.primero as f64,
             confianza: self.confianza,
+            golpes: self.golpes,
             pausa: self.pausa,
+            subida: if self.pausa { self.subida } else { 0.0 },
             seccion: self.seccion.take(),
         };
         self.pico = 0.0;
         self.golpe = false;
+        self.golpes = [false; 3];
         estado
     }
 
@@ -273,13 +323,18 @@ impl Analizador {
         let n = self.contadas as f64;
         let mut flujo = 0.0;
         let mut total = 0.0;
+        let mut flujos = [0.0f32; 3];
+        let mut crecido = [0.0f32; 3];
         for (b, peso) in PESOS.iter().enumerate() {
             let energia = self.suma[b] / n;
             total += energia;
             let l = (energia + PISO).ln() as f32;
             self.corta[b] += (energia as f32 - self.corta[b]) * SUAVE_SECCION;
             // Subida respecto a hace dos medidas (los golpes tardan unos ms en crecer)
-            flujo += (l - self.antes[b][0]).max(0.0) * peso;
+            flujos[b] = (l - self.antes[b][0]).max(0.0);
+            // Cuánta energía ha ganado la banda (no en logaritmo), para saber qué banda sube más
+            crecido[b] = (energia as f32 - (self.antes[b][0].exp() - PISO as f32)).max(0.0);
+            flujo += flujos[b] * peso;
             self.antes[b] = [self.antes[b][1], l];
             self.techo[b] = l.max(self.techo[b] - 0.002);
             self.bandas_ahora[b] = ((l - self.techo[b]) / RANGO_BANDA + 1.0).clamp(0.0, 1.0);
@@ -293,6 +348,15 @@ impl Analizador {
         guardar(&mut self.flujo, flujo);
         self.medidas += 1;
         self.buscar_golpe(flujo);
+        let crecido_total: f32 = crecido.iter().sum();
+        for (b, f) in flujos.into_iter().enumerate() {
+            // Solo cuenta si esta banda pone una buena parte de lo que ha subido el sonido
+            let propio = crecido_total > 0.0 && crecido[b] / crecido_total >= PARTE_GOLPE_BANDA;
+            let f = if propio { f } else { 0.0 };
+            if self.detectores[b].mirar(f, self.medidas, MINIMO_GOLPE_BANDA, SEPARACION_GOLPE_BANDA) {
+                self.golpes[b] = true;
+            }
+        }
         self.avanzar_pulso();
         self.seguir_pausa(total as f32);
         if self.medidas.is_multiple_of(REVISAR_CADA) {
@@ -319,6 +383,8 @@ impl Analizador {
                     self.pausa = true;
                     self.pausa_desde = desde;
                     self.minimo_pausa = graves;
+                    self.total_pausa = total;
+                    self.subida = 0.0;
                     self.seccion = Some(Seccion::Pausa);
                 }
             } else {
@@ -327,6 +393,9 @@ impl Analizador {
             return;
         }
         self.minimo_pausa = self.minimo_pausa.min(graves);
+        // La subida: cuánto ha crecido la energía desde que empezó la pausa (nunca baja de golpe)
+        let crecido = ((total - self.total_pausa) / SUBIDA_PLENA).clamp(0.0, 1.0);
+        self.subida = crecido.max(self.subida - 0.002);
         if !hay_musica {
             // Se acabó la canción: no hay vuelta
             self.pausa = false;
@@ -369,17 +438,10 @@ impl Analizador {
 
     /// Golpe: un máximo del flujo claramente por encima de lo normal en esta canción.
     fn buscar_golpe(&mut self, flujo: f32) {
-        let umbral = (self.media + self.varianza.sqrt() * DESVIACIONES_GOLPE).max(MINIMO_GOLPE);
-        let cresta = self.previo > umbral && self.previo >= self.antes_previo && self.previo > flujo;
         let separacion = (self.periodo * 0.4).max(10.0) as u64;
-        if cresta && self.medidas - self.ultimo_golpe >= separacion {
+        if self.detector.mirar(flujo, self.medidas, MINIMO_GOLPE, separacion) {
             self.golpe = true;
-            self.ultimo_golpe = self.medidas;
         }
-        self.media += (flujo - self.media) * 0.01;
-        self.varianza += ((flujo - self.media).powi(2) - self.varianza) * 0.01;
-        self.antes_previo = self.previo;
-        self.previo = flujo;
     }
 
     /// El pulso avanza; un cuarto de pulso después de cada uno se apuntan sus graves (compás).
@@ -564,6 +626,8 @@ mod pruebas {
             (semilla >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0
         };
         let mut previo = 0.0;
+        // Ruido de la caja filtrado hacia los medios (como suena una caja de verdad, con cuerpo)
+        let mut caja_filtrada = 0.0;
         let mut salida = Vec::new();
         let mut inicio = 0.0;
         for p in partes {
@@ -579,8 +643,9 @@ mod pruebas {
                     let fuerza = if indice == primero { 0.8 } else { 0.4 };
                     s += fuerza * (-desde * 25.0).exp() * (TAU as f32 * 55.0 * desde).sin();
                 }
+                caja_filtrada += (r - caja_filtrada) * 0.25;
                 if indice % 2 == (primero + 1) % 2 {
-                    s += p.caja * (-desde * 30.0).exp() * r;
+                    s += p.caja * (-desde * 30.0).exp() * caja_filtrada * 2.0;
                 }
                 let medio = t - (pulso + 0.5) * periodo;
                 if medio >= 0.0 {
@@ -688,6 +753,58 @@ mod pruebas {
         assert!((e.intervalo / 500.0 - 1.0).abs() < 0.02, "intervalo {} ms", e.intervalo);
     }
 
+    /// Golpes de cada instrumento (bombo, caja, platillos) en una pista, sin contar los 3 primeros
+    /// segundos (mientras se ajustan los umbrales).
+    fn golpes_por_instrumento(muestras: &[f32]) -> [u32; 3] {
+        let mut a = Analizador::nuevo(FS);
+        let mut cuenta = [0; 3];
+        for (i, trozo) in muestras.chunks(480).enumerate() {
+            a.procesar(trozo);
+            if i % 3 == 0 {
+                let e = a.estado();
+                if i >= 300 {
+                    for (c, g) in cuenta.iter_mut().zip(e.golpes) {
+                        *c += u32::from(g);
+                    }
+                }
+            }
+        }
+        cuenta
+    }
+
+    #[test]
+    fn cada_instrumento_por_su_lado() {
+        // 8 s a 120 ppm, sin los 3 primeros: 10 pulsos (bombo), 5 cajas y 10 platillos
+        let solo = |bombo, caja, platillo| pista_partes(120.0, 0, &[Parte { segundos: 8.0, bombo, caja, platillo }]);
+        let bombo = golpes_por_instrumento(&solo(true, 0.0, 0.0));
+        assert!(bombo[0] >= 8 && bombo[1] <= 2 && bombo[2] <= 2, "solo bombo: {bombo:?}");
+        let caja = golpes_por_instrumento(&solo(false, 0.4, 0.0));
+        // Una caja de verdad también tiene agudos: que salten los platillos no importa
+        assert!(caja[1] >= 4 && caja[1] <= 6 && caja[0] <= 2, "solo caja: {caja:?}");
+        let platillo = golpes_por_instrumento(&solo(false, 0.0, 0.3));
+        assert!(platillo[2] >= 8 && platillo[0] <= 2, "solo platillos: {platillo:?}");
+    }
+
+    #[test]
+    fn subida_en_la_pausa() {
+        // Sin bombo y con la caja cada vez más fuerte: la subida antes del «drop»
+        let crece = |caja| Parte { segundos: 1.0, bombo: false, caja, platillo: 0.1 };
+        let partes = [parte(10.0, COMPLETA), crece(0.05), crece(0.1), crece(0.2), crece(0.4), crece(0.8), parte(3.0, COMPLETA)];
+        let mut a = Analizador::nuevo(FS);
+        let mut subidas = Vec::new();
+        for (i, trozo) in pista_partes(120.0, 0, &partes).chunks(480).enumerate() {
+            a.procesar(trozo);
+            if i % 3 == 0 {
+                subidas.push((i as f32 * 0.01, a.estado().subida));
+            }
+        }
+        let en = |t: f32| subidas.iter().find(|(s, _)| *s >= t).map_or(0.0, |(_, v)| *v);
+        assert!(en(8.0) == 0.0, "sin pausa, sin subida: {}", en(8.0));
+        assert!(en(12.5) < en(14.9), "la subida crece: {} → {}", en(12.5), en(14.9));
+        assert!(en(14.9) > 0.5, "subida al final: {}", en(14.9));
+        assert!(en(16.5) == 0.0, "tras el drop, sin subida: {}", en(16.5));
+    }
+
     #[test]
     fn silencio_sin_golpes() {
         let mut a = Analizador::nuevo(FS);
@@ -695,7 +812,7 @@ mod pruebas {
         for _ in 0..500 {
             a.procesar(&ceros);
             let e = a.estado();
-            assert!(!e.golpe && !e.pausa && e.seccion.is_none());
+            assert!(!e.golpe && !e.golpes.contains(&true) && !e.pausa && e.seccion.is_none());
             assert_eq!(e.confianza, 0.0);
         }
     }

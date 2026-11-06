@@ -44,9 +44,22 @@ export interface ConfigCompanero {
   tranquilo: boolean;
   /** Opacidad del cuerpo: 1 sólido; menos, cristal que deja ver lo de detrás (hasta 0.5) */
   opacidad: number;
+  /** Cuánto se mueve al bailar */
+  baile: BaileCompanero;
 }
 
-export const COMPANERO_POR_DEFECTO: ConfigCompanero = { color: "#f5f7ff", tamano: 1, tranquilo: false, opacidad: 1 };
+export type BaileCompanero = "discreto" | "normal" | "fiestero";
+
+export const COMPANERO_POR_DEFECTO: ConfigCompanero = { color: "#f5f7ff", tamano: 1, tranquilo: false, opacidad: 1, baile: "normal" };
+
+/** Cuánto baila con cada opción (lo normal, 1). */
+export const FACTOR_BAILE: Record<BaileCompanero, number> = { discreto: 0.5, normal: 1, fiestero: 1.3 };
+
+export const BAILES_COMPANERO: [BaileCompanero, string][] = [
+  ["discreto", "Discreto"],
+  ["normal", "Normal"],
+  ["fiestero", "Fiestero"],
+];
 
 /** Colores de cara que se pueden elegir: [valor, nombre], en este orden. */
 export const COLORES_COMPANERO: [string, string][] = [

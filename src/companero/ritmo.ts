@@ -2,12 +2,13 @@
 // 30 veces por segundo el nivel, las bandas, si hubo golpe, el tempo, el pulso y las partes de
 // la canción. Aquí se lleva el pulso entre mensaje y mensaje (sin saltos), se calculan la
 // energía y la intensidad de esta parte, se sacan las notitas con los golpes y se avisa al
-// baile de las partes nuevas, las pausas y la vuelta de la música.
+// baile de las partes nuevas, las pausas y la vuelta de la música. De cada instrumento (bombo,
+// caja, platillos) se lleva su golpe y si está sonando, para que el baile siga lo que suena.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { cambiosMusica, musicaSonando } from "../estado/musica";
+import { cambioCancion, cambiosMusica, musicaSonando } from "../estado/musica";
 import { crearSenal } from "../estado/senal";
-import { celebrarVuelta, nuevaParte, pasoActual } from "./baile";
+import { celebrarVuelta, empezarCancion, nuevaParte, pasoActual } from "./baile";
 
 /** Sin mensajes nuevos en este tiempo, se considera que no hay audio. */
 const SIN_AUDIO_MS = 500;
@@ -32,6 +33,10 @@ interface EstadoAudio {
   pulso: number;
   confianza: number;
   pausa: boolean;
+  /** Golpes de bombo, caja y platillos desde el mensaje anterior */
+  golpes: [boolean, boolean, boolean];
+  /** En una pausa, cuánto ha crecido la música (0 a 1): la subida antes del «drop» */
+  subida: number;
   /** Momento de la canción, si lo hubo desde el mensaje anterior */
   seccion: "cambio" | "pausa" | "vuelta" | null;
 }
@@ -65,6 +70,13 @@ export const ritmo = {
   pausa: false,
   /** Energía de graves, medios y agudos (0 a 1) */
   bandas: [0, 0, 0] as [number, number, number],
+  /** Golpe de bombo, caja y platillos: 1 justo en el golpe, baja a 0 enseguida */
+  instrumentos: [0, 0, 0] as [number, number, number],
+  /** Si cada instrumento está sonando: 1 si ha dado un golpe hace poco, baja a 0 en un par de
+   * segundos sin golpes (una parte solo con guitarra no tiene bombo) */
+  presencia: [0, 0, 0] as [number, number, number],
+  /** En una pausa, cuánto ha crecido la música (0 a 1): la subida antes del «drop» */
+  subida: 0,
   notas: [] as Nota[],
 };
 
@@ -152,6 +164,12 @@ function procesar(e: EstadoAudio): void {
   ritmo.bandas = [e.graves, e.medios, e.agudos];
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
+  ritmo.subida += (e.subida - ritmo.subida) * 0.2;
+  e.golpes.forEach((g, i) => {
+    if (!g) return;
+    ritmo.instrumentos[i] = 1;
+    ritmo.presencia[i] = 1;
+  });
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
   if (e.seccion === "cambio") {
     nuevaParte();
@@ -185,6 +203,12 @@ function procesar(e: EstadoAudio): void {
 /** El latido se apaga poco a poco (llamar en cada fotograma; dt en fotogramas de 60 Hz). */
 export function apagarLatido(dt: number): void {
   ritmo.latido *= Math.pow(0.86, dt);
+  // Los golpes de cada instrumento se apagan enseguida (los platillos, antes); su presencia, en un
+  // par de segundos
+  ritmo.instrumentos[0] *= Math.pow(0.84, dt);
+  ritmo.instrumentos[1] *= Math.pow(0.82, dt);
+  ritmo.instrumentos[2] *= Math.pow(0.72, dt);
+  for (let i = 0; i < 3; i++) ritmo.presencia[i] *= Math.pow(0.985, dt);
 }
 
 export function iniciarRitmo(): void {
@@ -197,6 +221,8 @@ export function iniciarRitmo(): void {
     invoke("escuchar_audio", { activo: sonando }).catch(console.error);
   };
   cambiosMusica.escuchar(actualizar);
+  // Otra canción: primero la escucha un momento antes de soltarse a bailar
+  cambioCancion.escuchar(() => empezarCancion());
   actualizar();
   listen<EstadoAudio>("audio-ritmo", ({ payload }) => procesar(payload)).catch(console.error);
 }
