@@ -461,8 +461,10 @@ let cambio = 0;
 /** Si ya está bailando (si no, el primer paso se elige enseguida) y en qué pulso empezó el paso. */
 let empezado = false;
 let desdePulso = 0;
-/** Hasta qué pulso escucha la canción antes de bailar. */
+/** Hasta qué pulso escucha la canción antes de bailar, y si toca escucharla (solo al empezar una
+ * canción: si deja de bailar un momento, por un gesto o un aviso, al volver sigue bailando). */
 let escucharHasta = 0;
+let escucharAlEmpezar = true;
 
 /** Lo que se oye ahora de cada instrumento (ritmo.ts) y cuánto bailar. */
 export interface Oido {
@@ -478,6 +480,7 @@ export interface Oido {
 export function empezarCancion(): void {
   empezado = false;
   cambiarEnCompas = false;
+  escucharAlEmpezar = true;
 }
 
 /** Cada instrumento mueve su parte, con el movimiento del paso (al ritmo del pulso): con bombo,
@@ -539,9 +542,12 @@ const ENERGIA_CALMA = 1.5;
 const DESDE_CALMA = 0.35;
 const DESDE_TRISTE = 0.5;
 
-const triste = () => caracter?.tono != null && caracter.tono < TONO_TRISTE;
+/** Triste y sin energía para bailar: una canción triste pero bailable (Blue Monday) se baila como
+ * bailable; si no, casi no bailaba. */
+const triste = () =>
+  caracter?.tono != null && caracter.tono < TONO_TRISTE && !(caracter.energia != null && caracter.energia >= ENERGIA_SALTA);
 const enCalma = () => caracter?.energia != null && caracter.energia < ENERGIA_CALMA;
-/** Sin saltos: canción triste o sin energía para saltar. */
+/** Sin saltos: canción triste (y lenta) o sin energía para saltar. */
 const sinSaltos = () => triste() || (caracter?.energia != null && caracter.energia < ENERGIA_SALTA);
 
 /** Amplitud de los movimientos según el género (1 = como siempre). */
@@ -570,6 +576,17 @@ function amplitudBaile(): number {
 function generoPrincipal(c: CaracterBaile | null): Estilo | null {
   const lista = Object.entries(c?.estilos ?? {}) as [Estilo, number][];
   return lista.length ? lista.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : null;
+}
+
+/** Electrónica movida (Jev) medida a menos de PPM_ELECTRONICA_LENTA: por cuánto multiplicar el
+ * tempo para que caiga entre 110 y 150 (×1,5 o ×2), o 1 si no hay que corregirlo. En otros
+ * géneros no se toca: en la fiesta y el reguetón son normales tempos de 90. */
+const PPM_ELECTRONICA_LENTA = 100;
+function correccionElectronica(ppm: number): number {
+  if (generoPrincipal(caracter) !== "electronica" || (caracter?.energia ?? 0) < ENERGIA_SALTA || ppm >= PPM_ELECTRONICA_LENTA) return 1;
+  if (ppm * 1.5 >= 110 && ppm * 1.5 <= 150) return 1.5;
+  if (ppm * 2 >= 110 && ppm * 2 <= 150) return 2;
+  return 1;
 }
 
 /** Cómo es la canción (Jev); null para volver a bailar solo por el ritmo. */
@@ -722,6 +739,13 @@ export function bailar(
     pulso /= 2;
     intervalo *= 2;
   }
+  // Electrónica movida con un tempo medido lento: seguramente se midió 2/3 o la mitad del real
+  // (patrones de bombo sincopados). Se baila al tempo que encaja con el género
+  const corregir = correccionElectronica(60_000 / intervalo);
+  if (corregir !== 1) {
+    pulso *= corregir;
+    intervalo /= corregir;
+  }
   const c = Math.floor(pulso / 4);
   const empiezaCompas = c !== compas;
   compas = c;
@@ -748,10 +772,11 @@ export function bailar(
     cambiarA(CELEBRA, ahora);
   } else if (actual === CELEBRA && pulso < celebrarHasta) {
     // Sigue celebrando
-  } else if (!empezado && oido) {
+  } else if (!empezado && oido && escucharAlEmpezar) {
     // Empieza la canción: primero la escucha un par de compases
     cambiarA(ESCUCHA, ahora);
     empezado = true;
+    escucharAlEmpezar = false;
     escucharHasta = (c + COMPASES_ESCUCHA) * 4;
   } else if (actual === ESCUCHA && pulso < escucharHasta) {
     // Sigue escuchando

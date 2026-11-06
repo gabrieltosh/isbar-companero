@@ -77,6 +77,17 @@ const TONO_PUNO = 3;
 const ENERGIA_PUNO = 3.3;
 /** Rock con esta energía, en el estribillo: cuernos en vez de puño (aunque no sea alegre). */
 const ENERGIA_CUERNOS = 2.8;
+/** Canción triste pero bailable (energía de Jev desde ENERGIA_BAILABLE): en la cara no hay
+ * puchero ni lágrimas; se queda en TONO_BAILABLE, serio y con los ojos cerrados, concentrado. */
+const ENERGIA_BAILABLE = 2.5;
+const TONO_BAILABLE = 1.4;
+
+/** El tono con el que pone la cara (el de Jev, salvo en una canción triste pero bailable). */
+function tonoCara(jev: { tono: number | null; energia: number | null } | null): number | undefined {
+  if (jev?.tono == null) return undefined;
+  return (jev.energia ?? 0) >= ENERGIA_BAILABLE ? Math.max(jev.tono, TONO_BAILABLE) : jev.tono;
+}
+
 /** Concentrado (programando, escribiendo…): baila con tanto de lo normal. */
 const FACTOR_CONCENTRADO = 0.45;
 /** Cuánto se acerca el cuerpo al paso en cada fotograma al bailar (menos, más suave). */
@@ -228,7 +239,8 @@ function fotograma(ahora: number): void {
     ojosObjetivo = paso.ojos;
     // Si la canción es triste, los ojos felices se cierran; en una balada también, a gusto
     const jev = caracterActual();
-    const triste = jev?.tono != null && jev.tono < TONO_OJOS_FELICES;
+    const tono = tonoCara(jev);
+    const triste = tono !== undefined && tono < TONO_OJOS_FELICES;
     if ((triste || estiloPrincipal(jev?.estilos) === "balada") && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
   } else if (expresion === "aplaude") {
     // Aplaude dando saltitos y al final hace una reverencia (se inclina hacia delante)
@@ -269,7 +281,8 @@ function fotograma(ahora: number): void {
   const caracterJev = caracterActual();
   // La boca: la cara que pide la canción (género, tono y la parte en que está), sin cantar
   const momento = !conRitmo ? null : ritmo.pausa ? "pausa" : pasoActual() === "celebra" ? "celebra" : null;
-  const bocaObjetivo = bocaMusical({ tono: caracterJev?.tono, estilos: caracterJev?.estilos, intensidad: ritmo.intensidad, momento });
+  const tono = tonoCara(caracterJev);
+  const bocaObjetivo = bocaMusical({ tono, estilos: caracterJev?.estilos, intensidad: ritmo.intensidad, momento });
   for (const c of Object.keys(bocaBaile) as (keyof Boca)[]) bocaBaile[c] = acercar(bocaBaile[c], bocaObjetivo[c], 0.06);
   // En la parte más fuerte: cuernos con una canción de rock con energía, o puño en alto con una
   // muy alegre e intensa; con su golpe en cada pulso
@@ -290,8 +303,8 @@ function fotograma(ahora: number): void {
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
           amor: caracterJev?.amor ?? undefined,
-          tono: caracterJev?.tono ?? undefined,
-          lagrima: (caracterJev?.tono ?? 4) < TONO_LAGRIMA,
+          tono,
+          lagrima: (tono ?? 4) < TONO_LAGRIMA,
           puno,
           cuernos,
           estilo: estilo ?? undefined,
