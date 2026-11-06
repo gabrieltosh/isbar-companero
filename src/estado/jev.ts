@@ -175,6 +175,8 @@ export interface Emocion {
   tono: number;
   /** 0 para escuchar quieto · 1 para mecerse · 2 para moverse un poco · 3 para bailar · 4 para saltar */
   energia: number;
+  /** Probabilidad de que trate de amor (enamorarse, una relación o un desamor), de 0 a 1 */
+  amor: number;
   confianzaTono: number;
   confianzaEnergia: number;
 }
@@ -241,11 +243,16 @@ export async function emocionCancion(clave: string, c: DatosCancion): Promise<Em
         criteria: TONOS,
       },
       energia: { type: "score", instructions: "Cuánta energía tiene esta canción para bailar", criteria: ENERGIAS },
+      amor: {
+        type: "noul",
+        instructions: "¿La letra de esta canción trata de amor romántico: enamorarse, querer a alguien, una relación o un desamor?",
+      },
     },
   );
   return {
     tono: respuestas.tono.score,
     energia: respuestas.energia.score,
+    amor: respuestas.amor.noul,
     confianzaTono: respuestas.tono.confidence,
     confianzaEnergia: respuestas.energia.confidence,
   };

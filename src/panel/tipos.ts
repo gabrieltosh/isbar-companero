@@ -29,6 +29,8 @@ export interface EstadoPanel {
   caracter: {
     tono: number | null;
     energia: number | null;
+    /** Probabilidad de que sea de amor (0 a 1), o null */
+    amor: number | null;
     estilo: string | null;
     confianzaEstilo: number;
     estilos: Partial<Record<string, number>> | null;

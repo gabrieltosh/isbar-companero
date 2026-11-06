@@ -45,6 +45,8 @@ interface Recuerdo extends Partial<Emocion>, Partial<EstiloBaile> {
 export interface CaracterUsable {
   tono: number | null;
   energia: number | null;
+  /** Probabilidad de que sea una canción de amor (0 a 1), o null si no se sabe */
+  amor: number | null;
   /** Género más probable (si Jev está bastante seguro o se corrigió), o null */
   estilo: Estilo | null;
   confianzaEstilo: number;
@@ -81,6 +83,7 @@ function usable(r: Recuerdo): CaracterUsable | null {
   return {
     tono: r.tono ?? null,
     energia: r.energia ?? null,
+    amor: r.amor ?? null,
     estilo: estilos ? (r.estilo ?? null) : null,
     confianzaEstilo: r.corregido?.estilo ? 1 : (r.confianzaEstilo ?? 0),
     estilos,
@@ -130,7 +133,8 @@ async function preguntar(estiloSolo = false): Promise<void> {
   if (!datos || !cancion || !jevDisponible(config) || !config.baile) return;
   const pedida = cancion;
   const r = (memoria[pedida] ??= { visto: Date.now() });
-  const faltaEmocion = !estiloSolo && r.tono === undefined;
+  // También si se recordaba de antes de preguntar si es de amor
+  const faltaEmocion = !estiloSolo && (r.tono === undefined || r.amor === undefined);
   // Al empezar, el género solo si no se sabe; en una parte nueva, otra vez (con su ritmo)
   const pideEstilo = !r.corregido?.estilo && (estiloSolo || r.estilo === undefined);
   if (!faltaEmocion && !pideEstilo) return;
@@ -142,6 +146,7 @@ async function preguntar(estiloSolo = false): Promise<void> {
     ]);
     // Lo corregido a mano no se toca
     if (emocion) {
+      r.amor = emocion.amor;
       if (!r.corregido?.tono) Object.assign(r, { tono: emocion.tono, confianzaTono: emocion.confianzaTono });
       if (!r.corregido?.energia) Object.assign(r, { energia: emocion.energia, confianzaEnergia: emocion.confianzaEnergia });
     }

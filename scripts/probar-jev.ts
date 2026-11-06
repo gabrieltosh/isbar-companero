@@ -69,7 +69,8 @@ for (const c of canciones) {
   const marca = (b: boolean) => (b ? "✓" : "✗");
   console.log(
     `${marca(ok[0])}${marca(ok[1])}${marca(ok[2])} ${(c.titulo.replace(/ - .*/, "") + " · " + c.artista).padEnd(42)}` +
-      ` tono ${coma(c.e.tono)}  energía ${coma(c.e.energia)}  ${c.s.estilo.padEnd(11)} (${Math.round(c.s.confianzaEstilo * 100)} %)` +
+      ` tono ${coma(c.e.tono)}  energía ${coma(c.e.energia)}  amor ${String(Math.round(c.e.amor * 100)).padStart(3)} %` +
+      `  ${c.s.estilo.padEnd(11)} (${Math.round(c.s.confianzaEstilo * 100)} %)` +
       (ok[2] ? "" : `  esperado ${c.estilo}`),
   );
 }

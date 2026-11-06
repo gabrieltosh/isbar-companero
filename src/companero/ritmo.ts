@@ -13,9 +13,13 @@ import { celebrarVuelta, nuevaParte, pasoActual } from "./baile";
 const SIN_AUDIO_MS = 500;
 /** El baile va este tiempo por delante de lo analizado (mensaje y dibujo tardan un poco). */
 const ADELANTO_MS = 25;
-/** Notitas a la vez, como mucho, y lo que tarda cada una en subir y desvanecerse. */
-const MAX_NOTAS = 4;
-export const VIDA_NOTA = 1600;
+/** Notitas a la vez, como mucho, y lo que tarda cada una en subir y desvanecerse (varía). */
+const MAX_NOTAS = 2;
+const VIDA_NOTA = 1600;
+/** Tiempo entre una notita y la siguiente (ms): en las partes tranquilas y en las intensas (con
+ * algo de azar). Muchas a la vez distraían: son un detalle de vez en cuando. */
+const ENTRE_NOTAS_TRANQUILA = 4500;
+const ENTRE_NOTAS_INTENSA = 2000;
 
 /** Lo que manda Rust (ritmo.rs). */
 interface EstadoAudio {
@@ -36,6 +40,14 @@ export interface Nota {
   nace: number;
   /** -1 sale por la izquierda, 1 por la derecha */
   lado: number;
+  /** Lo que tarda en subir y desvanecerse (ms) */
+  vida: number;
+  /** Para que cada una sea distinta: qué forma tiene (0 a 1), su tamaño, cuánto se mece al
+   * subir (0 a 1) y hacia dónde se inclina (-1 a 1) */
+  variante: number;
+  tam: number;
+  meceo: number;
+  giro: number;
 }
 
 export const ritmo = {
@@ -45,8 +57,6 @@ export const ritmo = {
   intensidad: 0.5,
   /** 1 justo en un golpe detectado; baja a 0 enseguida */
   latido: 0,
-  /** Lado de la última notita */
-  lado: 1,
   /** Milisegundos entre pulsos (tempo estimado) */
   intervalo: 500,
   /** Qué claro está el ritmo (0 a 1) */
@@ -55,9 +65,6 @@ export const ritmo = {
   pausa: false,
   /** Energía de graves, medios y agudos (0 a 1) */
   bandas: [0, 0, 0] as [number, number, number],
-  /** Cuánta voz hay ahora (0 a 1): los medios respecto a lo más fuerte que han sonado hace poco
-   * (la voz cantada está sobre todo en los medios) */
-  voz: 0,
   notas: [] as Nota[],
 };
 
@@ -96,16 +103,29 @@ export function resumenRitmo(): { ppm: number; confianza: number; golpes: number
   return { ppm: Math.round(60_000 / ritmo.intervalo), confianza: ritmo.confianza, golpes, partes, pausa: ritmo.pausa, paso: pasoActual() };
 }
 
-/** Saca una notita por un lado (como mucho MAX_NOTAS a la vez). */
-function sacarNota(ahora: number, lado: number): void {
-  ritmo.notas = ritmo.notas.filter((n) => ahora - n.nace < VIDA_NOTA).slice(-(MAX_NOTAS - 1));
-  ritmo.notas.push({ nace: ahora, lado });
+/** Cuándo puede salir la siguiente notita. */
+let siguienteNota = 0;
+
+/** Saca una notita por un lado, cada una con su forma, tamaño y vaivén (como mucho MAX_NOTAS a
+ * la vez). `retraso`: para que salga un poco después (ms). */
+function sacarNota(ahora: number, lado: number, retraso = 0): void {
+  ritmo.notas = ritmo.notas.filter((n) => ahora - n.nace < n.vida).slice(-(MAX_NOTAS - 1));
+  ritmo.notas.push({
+    nace: ahora + retraso,
+    lado,
+    vida: VIDA_NOTA * (0.8 + Math.random() * 0.45),
+    variante: Math.random(),
+    tam: 0.75 + Math.random() * 0.4,
+    meceo: 0.3 + Math.random() * 0.7,
+    giro: Math.random() * 2 - 1,
+  });
+  // La siguiente, dentro de un rato: más pronto cuanto más intensa es esta parte
+  const espera = ENTRE_NOTAS_TRANQUILA + (ENTRE_NOTAS_INTENSA - ENTRE_NOTAS_TRANQUILA) * ritmo.intensidad;
+  siguienteNota = ahora + retraso + espera * (0.75 + Math.random() * 0.5);
 }
 
 /** El sonido más fuerte de hace poco: con él se ajusta la escala (ganancia automática). */
 let pico = 0;
-/** Lo mismo para los medios (la voz). */
-let picoMedios = 0;
 /** Por debajo de esto (sin ajustar) se considera silencio. */
 const SILENCIO = 0.004;
 
@@ -130,10 +150,6 @@ function procesar(e: EstadoAudio): void {
   const intensidad = Math.max(0, Math.min(1, (larga - minimo) / rango));
   ritmo.intensidad += (intensidad - ritmo.intensidad) * 0.03;
   ritmo.bandas = [e.graves, e.medios, e.agudos];
-  // Voz: sube enseguida y baja algo más despacio (para que la boca no tiemble)
-  picoMedios = Math.max(e.medios, picoMedios * 0.996);
-  const voz = e.medios < SILENCIO ? 0 : Math.min(1, e.medios / Math.max(picoMedios, 0.01));
-  ritmo.voz += (voz - ritmo.voz) * (voz > ritmo.voz ? 0.5 : 0.15);
   ritmo.confianza = e.confianza;
   ritmo.pausa = e.pausa;
   if (e.seccion === "cambio" || e.seccion === "vuelta") partes += 1;
@@ -160,11 +176,9 @@ function procesar(e: EstadoAudio): void {
   if (!e.golpe) return;
   ritmo.latido = 1;
   golpes += 1;
-  // Una notita cada dos golpes, alternando el lado
-  if (golpes % 2 === 0) {
-    ritmo.lado = -ritmo.lado;
-    sacarNota(ahora, ritmo.lado);
-  }
+  // Notitas de vez en cuando (no en cada golpe): cada pocos segundos, más seguidas en las partes
+  // intensas, siempre en un golpe y por un lado u otro al azar. Ninguna en una pausa
+  if (!ritmo.pausa && ahora >= siguienteNota) sacarNota(ahora, Math.random() < 0.5 ? -1 : 1);
   golpe.emitir();
 }
 

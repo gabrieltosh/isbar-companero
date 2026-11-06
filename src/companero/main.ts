@@ -6,12 +6,14 @@ import { COMPANERO_POR_DEFECTO, EVENTO_AJUSTES, type ConfigCompanero } from "../
 import { guardar, leer } from "../store";
 import { $ } from "../util";
 import {
+  bocaMusical,
   bostezo,
   dibujarCara,
   pelota,
   dibujarExtras,
   mezclar,
   rasgosDe,
+  type Boca,
   type Expresion,
   type OjosBaile,
   type Pose,
@@ -23,8 +25,8 @@ import { iniciarAvisos, peticionApp, progresoPomodoro } from "./avisos";
 import { avisar, cerrar as cerrarGlobo, globoActual } from "./globos";
 import { activarNoMolestar, iniciarNoMolestar, minutosNoMolestar, noMolestar, quitarNoMolestar, type DuracionNoMolestar } from "./noMolestar";
 import { iniciarPuente } from "./puente";
-import { VIDA_NOTA, apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
-import { SIN_BAILE, bailar, pararBaile, type Movimiento } from "./baile";
+import { apagarLatido, hayAudio, iniciarRitmo, pulsoAhora, ritmo } from "./ritmo";
+import { SIN_BAILE, bailar, pararBaile, pasoActual, type Movimiento } from "./baile";
 import { hayIconoSistema, iconoSistema, iniciarSistema } from "./sistema";
 import { iniciarClima } from "./clima";
 import { caracterActual, iniciarCaracter } from "./caracter";
@@ -63,11 +65,12 @@ const RIGIDEZ = 0.1;
 const AMORTIGUACION = 0.16;
 /** Sacudirlo así de veces mientras lo llevas lo deja mareado al soltarlo. */
 const SACUDIDAS_MAREO = 4;
-/** Canta cuando la voz de la canción pasa de esto (0 a 1). */
-const VOZ_CANTA = 0.45;
 /** Canción muy triste (tono de Jev por debajo): ojos cerrados y alguna lágrima. Muy alegre e
  * intensa (tono y energía por encima, en el estribillo): puño en alto. */
 const TONO_LAGRIMA = 0.8;
+/** Por debajo de este tono la canción es triste: los ojos felices (^ ^) también sonríen, así que
+ * se cierran, como quien escucha con calma. Con una neutra se quedan: si no, se veía serio. */
+const TONO_OJOS_FELICES = 1.5;
 const TONO_PUNO = 3;
 const ENERGIA_PUNO = 3.3;
 const ESTRIBILLO = 0.7;
@@ -130,8 +133,8 @@ const pose: Pose = { miraX: 0, miraY: 0, parpadeo: 0, giro: 0, salto: 0 };
 const baile: Movimiento = { ...SIN_BAILE };
 /** Ojos del baile, mezclados para pasar de un paso a otro sin saltos */
 const ojosBaile: Record<OjosBaile, number> = { felices: 1, cerrados: 0, abiertos: 0, apretados: 0 };
-/** Cuánto canta (0: sonríe con la boca cerrada; 1: canta), para pasar de uno a otro sin saltos */
-let canto = 0;
+/** Boca al bailar, que pasa poco a poco de una expresión a otra (como los ojos) */
+const bocaBaile: Boca = { ...bocaMusical({ intensidad: 0.5, momento: null }) };
 let expresionActual: Expresion = "normal";
 let progresoActual = 0;
 // Morph: al cambiar de cara, los rasgos van de los que se veían a los de la cara nueva.
@@ -140,6 +143,8 @@ let rasgosVistos: Rasgos = rasgosDe("normal", 0, 0);
 let morph: { desde: Rasgos; extras: Expresion; progresoExtras: number; inicio: number } | null = null;
 
 const acercar = (a: number, b: number, k: number) => a + (b - a) * k;
+/** Salto de la cabeza al bailar, suavizado entre fotogramas. */
+let saltoBaile = 0;
 const centro = () => (MARGEN + LADO / 2) * config.tamano;
 
 // ---------- Animación ----------
@@ -200,16 +205,13 @@ function fotograma(ahora: number): void {
   const conRitmo = expresion === "musica" && hayAudio();
   let objetivoBaile = SIN_BAILE;
   let ojosObjetivo: OjosBaile = "felices";
-  let cantaObjetivo = 0;
   if (conRitmo) {
     const paso = bailar(ahora, pulsoAhora(), ritmo.energia, ritmo.intensidad, ritmo.intervalo, ritmo.pausa);
     objetivoBaile = paso.mov;
     ojosObjetivo = paso.ojos;
-    // Canta cuando el paso lo pide y además se oye la voz (así parece que canta la letra)
-    cantaObjetivo = paso.canta && ritmo.voz > VOZ_CANTA ? 1 : 0;
-    // Muy triste: los ojos felices se cierran
+    // Si la canción es triste, los ojos felices se cierran
     const tonoJev = caracterActual()?.tono;
-    if (tonoJev != null && tonoJev < TONO_LAGRIMA && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
+    if (tonoJev != null && tonoJev < TONO_OJOS_FELICES && ojosObjetivo === "felices") ojosObjetivo = "cerrados";
   } else if (expresion === "asiente") {
     // El cuerpo acompaña el sí
     objetivoBaile = { ...SIN_BAILE, y: Math.max(0, Math.sin(progreso * Math.PI * 6)) * 1.5 * (1 - progreso) };
@@ -238,8 +240,11 @@ function fotograma(ahora: number): void {
   for (const tipo of Object.keys(ojosBaile) as OjosBaile[]) {
     ojosBaile[tipo] = acercar(ojosBaile[tipo], tipo === ojosObjetivo ? 1 : 0, 0.08);
   }
-  canto = acercar(canto, cantaObjetivo, 0.06);
   const caracterJev = caracterActual();
+  // La boca: la cara que pide la canción (género, tono y la parte en que está), sin cantar
+  const momento = !conRitmo ? null : ritmo.pausa ? "pausa" : pasoActual() === "celebra" ? "celebra" : null;
+  const bocaObjetivo = bocaMusical({ tono: caracterJev?.tono, estilos: caracterJev?.estilos, intensidad: ritmo.intensidad, momento });
+  for (const c of Object.keys(bocaBaile) as (keyof Boca)[]) bocaBaile[c] = acercar(bocaBaile[c], bocaObjetivo[c], 0.06);
   // Puño en alto con cada pulso: canción muy alegre e intensa, en su parte más fuerte
   const puno =
     conRitmo &&
@@ -253,12 +258,11 @@ function fotograma(ahora: number): void {
     expresion === "musica"
       ? {
           ojos: ojosBaile,
-          canta: canto,
+          boca: bocaBaile,
           energia: conRitmo ? ritmo.energia : 0,
-          voz: conRitmo ? ritmo.voz : undefined,
           intensidad: ritmo.intensidad,
           notas: ritmo.notas,
-          vidaNota: VIDA_NOTA,
+          amor: caracterJev?.amor ?? undefined,
           tono: caracterJev?.tono ?? undefined,
           lagrima: (caracterJev?.tono ?? 4) < TONO_LAGRIMA,
           puno,
@@ -346,7 +350,9 @@ function fotograma(ahora: number): void {
     case "musica":
       // La cabeza sigue el paso de baile; mira hacia donde va
       giro += objetivoBaile.giroCara * movimiento;
-      salto = objetivoBaile.saltoCara * movimiento;
+      // El salto de la cabeza se suaviza como el giro: sin tirones en cada golpe
+      saltoBaile = acercar(saltoBaile, objetivoBaile.saltoCara * movimiento, 0.5);
+      salto = saltoBaile;
       pose.miraX = acercar(pose.miraX, objetivoBaile.miraX, 0.2);
       break;
     case "mareado":
@@ -407,7 +413,7 @@ function fotograma(ahora: number): void {
   }
   // El giro va por el camino corto: tras una vuelta entera (360°) no se deshace hacia atrás
   const giroCercano = giro + Math.round((pose.giro - giro) / 360) * 360;
-  pose.giro = acercar(pose.giro, giroCercano, expresion === "musica" ? 0.45 : 0.2);
+  pose.giro = acercar(pose.giro, giroCercano, expresion === "musica" ? 0.3 : 0.2);
   pose.giro -= Math.round(pose.giro / 360) * 360;
   pose.salto = salto;
 

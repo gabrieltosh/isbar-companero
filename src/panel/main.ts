@@ -432,7 +432,8 @@ function pintarMusica(e: EstadoPanel): void {
         : c.estilo
           ? `baile ${NOMBRE_ESTILO[c.estilo] ?? c.estilo} (${c.corregido.estilo ? "a mano" : `${Math.round(c.confianzaEstilo * 100)} %`})`
           : "baile según el ritmo";
-    caracter.textContent = `Jev: ${tono} · ${energia} · ${estilo}`;
+    const amor = (c.amor ?? 0) >= 0.6 ? " · de amor" : "";
+    caracter.textContent = `Jev: ${tono}${amor} · ${energia} · ${estilo}`;
     caracterAhora = c;
   }
   const r = e.ritmo;

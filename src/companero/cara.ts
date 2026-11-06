@@ -72,20 +72,19 @@ export type OjosBaile = "felices" | "cerrados" | "abiertos" | "apretados";
 export interface MusicaPose {
   /** Cuánto de cada tipo de ojos (suman 1; así se pasa de unos a otros sin saltos) */
   ojos: Record<OjosBaile, number>;
-  /** Cuánto canta: 0 sonríe con la boca cerrada, 1 canta con el volumen */
-  canta: number;
+  /** La boca al bailar (cerrada, según la canción: bocaMusical), ya suavizada */
+  boca: Boca;
   /** Nivel de ahora (0 a 1) */
   energia: number;
   /** Nivel medio de esta parte de la canción (0 a 1): tranquila o intensa */
   intensidad: number;
-  /** Notitas en el aire: cuándo nacieron y de qué lado salen */
-  notas: { nace: number; lado: number }[];
-  /** Lo que tarda cada notita en subir y desvanecerse (ms) */
-  vidaNota: number;
+  /** Notitas en el aire (ritmo.ts): cuándo nacieron, de qué lado salen, cuánto duran y lo que
+   * las hace distintas (forma, tamaño, vaivén e inclinación) */
+  notas: { nace: number; lado: number; vida: number; variante: number; tam: number; meceo: number; giro: number }[];
+  /** Probabilidad de que la canción sea de amor (Jev): entonces salen corazones */
+  amor?: number;
   /** Tono de la canción según Jev (0 muy triste … 4 muy alegre): cambia la cara al bailar, si se sabe */
   tono?: number;
-  /** Cuánta voz se oye (0 a 1): la boca canta con ella; sin esto, con el volumen */
-  voz?: number;
   /** Canción muy triste: de vez en cuando cae una lágrima */
   lagrima?: boolean;
   /** Puño en alto, con su golpe en cada pulso (1 → 0), o nada */
@@ -103,7 +102,7 @@ export interface Pose {
   giro: number;
   /** Rebote vertical, en px */
   salto: number;
-  /** Con música sonando y audio, cómo suena; si no, se canta con un ritmo fijo */
+  /** Con música sonando y audio, cómo suena (ojos y boca del baile); si no, una sonrisa */
   musica?: MusicaPose;
 }
 
@@ -129,6 +128,85 @@ const OJO_GRANDE = ojo(11.6, 5.8, 5.8);
 const OJO_CERRADO = ojo(10, 0.6, 0.6, 0, 0, 1);
 const SONRISA = boca(16, 6, 6);
 const SONRISA_ABIERTA = boca(22, 0, 12);
+
+// Bocas al bailar: siempre cerradas (abrirla para cantar casi nunca cuadraba con la canción).
+// Manda el tono de la canción (de boca hacia abajo a sonrisa amplia); el género solo le da su
+// toque, y lo que pasa en la canción (pausa, celebración, estribillo) la cambia un momento.
+
+/** Curva de la boca según el tono (0 muy triste … 4 muy alegre): ancho y bordes de arriba y abajo. */
+const BOCA_POR_TONO: [number, number, number][] = [
+  [14, -5.5, -4], // muy triste: puchero, arco hacia abajo marcado (como la cara triste)
+  [12, -2.4, -1.8], // algo triste o melancólica: claramente caída
+  [11.5, 1.8, 2.4], // neutra: sonrisa suave, a gusto (seria se veía enfadado)
+  [13, 3.2, 3.8], // alegre: sonrisa
+  [16, 5.5, 6.5], // muy alegre: sonrisa amplia
+];
+/** Sin saber el tono (sin Jev): de casi neutra en las partes tranquilas a sonriente en las intensas. */
+const TONO_SIN_JEV = 2.4;
+/** Toque de cada género: más ancha o estrecha (px), más o menos curva (×) y la mueca de lado del
+ * rock (grados y px, solo cuando sonríe). */
+const TOQUE_ESTILO: Record<string, { ancho: number; curva: number; mueca: number }> = {
+  rock: { ancho: 0, curva: 1, mueca: 1 },
+  pop: { ancho: 0, curva: 1, mueca: 0 },
+  electronica: { ancho: 0, curva: 0.6, mueca: 0 },
+  balada: { ancho: -1.5, curva: 1, mueca: 0 },
+  tranquila: { ancho: -1, curva: 0.9, mueca: 0 },
+  fiesta: { ancho: 2, curva: 1.15, mueca: 0 },
+};
+/** En una pausa de la canción: recta, esperando a que vuelva. */
+const BOCA_ESPERA = boca(7, 0.4, 0.6, 0, 0, 3);
+
+/** Lo que decide la boca al bailar. */
+export interface ComoSuena {
+  /** Tono de la canción según Jev (0 muy triste … 4 muy alegre), si se sabe */
+  tono?: number | null;
+  /** Peso de cada género según Jev (suman 1), si se sabe */
+  estilos?: Partial<Record<string, number>> | null;
+  /** Lo intensa que es esta parte de la canción (0 a 1): en el estribillo de una canción alegre sonríe más */
+  intensidad: number;
+  /** Momento especial: esperando en una pausa o celebrando que vuelve la música */
+  momento: "pausa" | "celebra" | null;
+}
+
+/** La boca que pide la música ahora (cerrada; sin suavizar). */
+export function bocaMusical(c: ComoSuena): Boca {
+  if (c.momento === "pausa") return BOCA_ESPERA;
+  let tono = c.tono ?? TONO_SIN_JEV + c.intensidad * 1.2;
+  // En el estribillo (la parte más intensa) de una canción alegre, algo más de sonrisa
+  if (tono >= 2.5) tono += limitar((c.intensidad - 0.7) / 0.3, 0, 1) * 0.5;
+  if (c.momento === "celebra") tono = Math.max(tono, 4);
+  tono = limitar(tono, 0, 4);
+  const i = Math.min(3, Math.floor(tono));
+  const k = tono - i;
+  const [a0, t0, b0] = BOCA_POR_TONO[i];
+  const [a1, t1, b1] = BOCA_POR_TONO[i + 1];
+  let ancho = a0 + (a1 - a0) * k;
+  let arriba = t0 + (t1 - t0) * k;
+  let abajo = b0 + (b1 - b0) * k;
+  // El toque del género (o de la mezcla de géneros)
+  const pesos = Object.entries(c.estilos ?? {}).filter(([e, w]) => TOQUE_ESTILO[e] && (w ?? 0) > 0) as [string, number][];
+  const total = pesos.reduce((s, [, w]) => s + w, 0);
+  let mueca = 0;
+  if (total > 0) {
+    let masAncho = 0;
+    let curva = 0;
+    for (const [e, w] of pesos) {
+      const toque = TOQUE_ESTILO[e];
+      masAncho += toque.ancho * (w / total);
+      curva += toque.curva * (w / total);
+      mueca += toque.mueca * (w / total);
+    }
+    ancho += masAncho;
+    // Solo cambia la sonrisa: una boca triste sigue igual de triste
+    if (arriba > 0) {
+      arriba *= curva;
+      abajo *= curva;
+    }
+  }
+  // La mueca de lado solo cuando sonríe
+  const sonrisa = limitar(arriba / 3, 0, 1);
+  return boca(ancho, arriba, abajo, -10 * mueca * sonrisa, 1.5 * mueca * sonrisa, 2.5);
+}
 
 function mezclarObj<T extends object>(a: T, b: T, k: number): T {
   const r = { ...a } as Record<string, number>;
@@ -239,11 +317,8 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
       return iguales(OJO_NORMAL, boca(9, -a, a, 0, 0, 3));
     }
     case "musica": {
-      if (!musica) {
-        const a = 2 + Math.abs(Math.sin(t / 55)) * 4;
-        return iguales(OJO_FELIZ, boca(10, -a, a, 0, 0, 3));
-      }
-      // Los ojos, según el paso de baile; la boca sonríe o canta con el volumen (a ratos)
+      if (!musica) return iguales(OJO_FELIZ, bocaMusical({ intensidad: 0.5, momento: null }));
+      // Los ojos, según el paso de baile; la boca, cerrada, según la canción (bocaMusical)
       const formas: Record<OjosBaile, Ojo> = {
         felices: OJO_FELIZ,
         cerrados: ojo(10.5, 1.2, -1.4, 0, 0, 1),
@@ -256,18 +331,16 @@ export function rasgosDe(expresion: Expresion, t: number, progreso: number, musi
         const f = formas[tipo];
         o = ojo(o.w + f.w * peso, o.t + f.t * peso, o.b + f.b * peso, o.giro + f.giro * peso, o.dx + f.dx * peso, o.dy + f.dy * peso);
       }
-      const a = 1 + limitar(musica.voz ?? musica.energia, 0, 1) * 4.5;
-      const cantando = boca(9 + a * 0.4, -a, a, 0, 0, 3);
-      let sonriendo = boca(13, 4, 4.5, 0, 0, 2);
-      // El tono de la canción (Jev), poco a poco: cuanto más triste, más caídas las cejas y menos
-      // sonrisa (hasta una boca hacia abajo); muy alegre, una sonrisa más amplia
+      // Con una canción triste (Jev), los ojos se caen un poco, como cejas tristes, y con una muy
+      // triste le tiembla el labio, como a punto de llorar
+      let b = musica.boca;
       if (musica.tono !== undefined) {
         const tristeza = limitar((1.5 - musica.tono) / 1.5, 0, 1);
-        const alegria = limitar((musica.tono - 3) / 1, 0, 1);
         o = { ...o, giro: o.giro - 14 * tristeza, dy: o.dy + tristeza };
-        sonriendo = mezclarObj(mezclarObj(sonriendo, boca(12, -2.5, -2.5, 0, 0, 3), tristeza), boca(16, 5, 6, 0, 0, 2), alegria);
+        const tiembla = Math.sin(t / 70) * 0.5 * limitar((1 - musica.tono) / 1, 0, 1);
+        if (tiembla) b = { ...b, t: b.t + tiembla, b: b.b - tiembla };
       }
-      return iguales(o, mezclarObj(sonriendo, cantando, limitar(musica.canta, 0, 1)));
+      return iguales(o, b);
     }
     case "silba":
       return iguales(ojo(8.4, 4.2, 4.2, 0, 0, -1), boca(5.2, -2.6, 2.6, 0, 2, 3));
@@ -361,15 +434,81 @@ const nota = (x: number, y: number, k: number, c: string) =>
   `<path d="M0 0v-9l6-2v9" stroke="${c}" stroke-width="2" stroke-linejoin="round" fill="none"/>` +
   `<circle cx="-1.5" cy="0" r="2" fill="${c}"/><circle cx="4.5" cy="-2" r="2" fill="${c}"/></g>`;
 
+/** Lo que sale con la música: notas de tres formas o, en una canción de amor, corazones (rotos
+ * si además es triste: desamor). */
+type Particula = "negra" | "corchea" | "doble" | "corazon" | "roto";
+/** Desde esta probabilidad (Jev) se trata como canción de amor; por debajo de este tono, desamor. */
+const AMOR = 0.6;
+const TONO_DESAMOR = 1.5;
+
+function formaParticula(variante: number, amor = 0, tono = 2): Particula {
+  if (amor >= AMOR) {
+    if (tono < TONO_DESAMOR) return variante < 0.45 ? "roto" : "negra";
+    return variante < 0.7 ? "corazon" : variante < 0.85 ? "corchea" : "doble";
+  }
+  return variante < 0.35 ? "corchea" : variante < 0.7 ? "doble" : "negra";
+}
+
+/** Trazo de una nota con su borde oscuro debajo. */
+const trazoNota = (d: string, c: string) =>
+  `<path d="${d}" stroke="${BORDE}" stroke-width="${n(2 + GROSOR_BORDE * 2)}" stroke-linejoin="round" stroke-linecap="round" fill="none"/>` +
+  `<path d="${d}" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
+const cabezaNota = (x: number, y: number, c: string) =>
+  `<circle cx="${x}" cy="${y}" r="${n(2 + GROSOR_BORDE)}" fill="${BORDE}"/><circle cx="${x}" cy="${y}" r="2" fill="${c}"/>`;
+const CORAZON = "M1.5 -0.5C-3.5 -3.5 -3 -9.5 1.5 -7C6 -9.5 6.5 -3.5 1.5 -0.5Z";
+// Las dos mitades de un corazón roto, cortadas en zigzag
+const CORAZON_IZQ = "M1.5 -0.5C-3.5 -3.5 -3 -9.5 1.5 -7L0.6 -5L2.2 -3.4Z";
+const CORAZON_DER = "M1.5 -0.5C6.5 -3.5 6 -9.5 1.5 -7L0.6 -5L2.2 -3.4Z";
+
+/** El dibujo de cada forma (k de 0 a 1: el corazón roto se va separando). */
+function dibujoParticula(forma: Particula, k: number, c: string): string {
+  switch (forma) {
+    case "negra":
+      return trazoNota("M0 0v-9", c) + cabezaNota(-1.5, 0, c);
+    case "corchea":
+      return trazoNota("M0 0v-9c2 1 3.5 2.5 3 5.5", c) + cabezaNota(-1.5, 0, c);
+    case "doble":
+      return trazoNota("M0 0v-9l6-2v9", c) + cabezaNota(-1.5, 0, c) + cabezaNota(4.5, -2, c);
+    case "corazon":
+      return `<path d="${CORAZON}" ${conBorde(c)}/>`;
+    case "roto": {
+      const s = k * 2.5;
+      const g = k * 14;
+      return (
+        `<path d="${CORAZON_IZQ}" ${conBorde(c)} transform="translate(${n(-s)} 0) rotate(${n(-g)} 1.5 -0.5)"/>` +
+        `<path d="${CORAZON_DER}" ${conBorde(c)} transform="translate(${n(s)} 0) rotate(${n(g)} 1.5 -0.5)"/>`
+      );
+    }
+  }
+}
+
+/** Una notita (o corazón) que sube meciéndose, con un pequeño «pop» al salir, y se desvanece. */
+function particula(nt: MusicaPose["notas"][number], t: number, c: string, forma: Particula): string {
+  const k = (t - nt.nace) / nt.vida;
+  const [x0, y0] = nt.lado > 0 ? [58, 30] : [-4, 26];
+  // Pop al salir: crece un poco de más y vuelve
+  const pop = k < 0.12 ? suave(k / 0.12) * 1.15 : k < 0.2 ? 1.15 - ((k - 0.12) / 0.08) * 0.15 : 1;
+  const x = x0 + nt.lado * k * 8 + Math.sin(k * Math.PI * 2 + nt.giro * 3) * 3 * nt.meceo;
+  const y = y0 - k * 28 * (0.85 + nt.tam * 0.2);
+  const giro = nt.giro * 12 + Math.sin(k * Math.PI * 2) * 10 * nt.meceo;
+  const opacidad = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+  return (
+    `<g opacity="${n(opacidad)}" transform="translate(${n(x)} ${n(y)}) rotate(${n(giro)}) scale(${n(nt.tam * pop)})">` +
+    dibujoParticula(forma, k, c) +
+    `</g>`
+  );
+}
+
 /** Canción muy triste: cada pocos segundos resbala una lágrima del ojo izquierdo. */
 function lagrima(t: number, p: Pose, c: string): string {
   if (!p.musica?.lagrima) return "";
   const k = (t % 5200) / 2200;
   if (k >= 1) return "";
+  // Redonda: se forma en el ojo (crece un poco) y luego cae
   const x = OJO_IZQ.x - 4 + p.miraX;
-  const y = OJO_IZQ.y + 6 + p.miraY + p.salto + k * 12;
-  const d = `M${n(x)} ${n(y)}c1.4 1.9 2.2 2.9 2.2 3.8a2.2 2.2 0 0 1 -4.4 0c0 -0.9 0.8 -1.9 2.2 -3.8z`;
-  return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)" opacity="${n(Math.min(1, (1 - k) * 2))}"><path d="${d}" ${conBorde(c)}/></g>`;
+  const y = OJO_IZQ.y + 8.6 + p.miraY + p.salto + k * 12;
+  const r = 2 * (k < 0.15 ? 0.45 + 0.55 * suave(k / 0.15) : 1);
+  return `<g transform="rotate(${n(limitar(p.giro, -80, 80))} 32 32)" opacity="${n(Math.min(1, (1 - k) * 2))}"><circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" ${conBorde(c)}/></g>`;
 }
 
 /** Puño en alto: solo un círculo (como las otras manitas) junto a la cabeza, que sube con cada
@@ -496,12 +635,11 @@ export function dibujarExtras(expresion: Expresion, t: number, progreso: number,
     }
     case "musica":
       if (p.musica) {
-        // Notitas que salen con los golpes de la canción, de un lado o del otro
-        const vida = p.musica.vidaNota;
+        // Notitas (o corazones) que salen con los golpes de la canción, cada una a su manera
+        const { amor, tono } = p.musica;
         const notas = p.musica.notas
-          .map((nt) => ({ k: (t - nt.nace) / vida, lado: nt.lado }))
-          .filter(({ k }) => k >= 0 && k < 1)
-          .map(({ k, lado }) => (lado > 0 ? nota(58, 30, k, c) : nota(-4, 26, k, c)))
+          .filter((nt) => t >= nt.nace && t < nt.nace + nt.vida)
+          .map((nt) => particula(nt, t, c, formaParticula(nt.variante, amor, tono)))
           .join("");
         return notas + lagrima(t, p, c) + puno(p.musica.puno, c);
       }
