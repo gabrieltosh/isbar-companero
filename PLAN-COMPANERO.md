@@ -270,7 +270,7 @@ Cada fase termina con algo que funciona y se puede probar.
   cuando cambia la música, o cada 8 compases (16 si es calmada); transición de unos dos pulsos.
 - **Instrumentos** (`ritmo.rs`): golpes de bombo, caja y platillos por separado. El bombo mueve el
   cuerpo, la caja la cabeza y los platillos un leve vaivén; si uno no suena, su parte se mueve
-  menos. El brillo de la cara late con el bombo.
+  menos. (El brillo de la cara latiendo con el bombo se probó y se quitó: parecía que temblaba.)
 - **Subida y drop**: en una pausa se mide cuánto crece la música; se agacha y se contiene (ojos
   apretados al final) y celebra al estallar.
 - **Principio y final**: escucha 2 compases antes de bailar; al terminar una canción entera

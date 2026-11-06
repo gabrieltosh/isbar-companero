@@ -293,7 +293,6 @@ function fotograma(ahora: number): void {
           puno,
           cuernos,
           estilo: estilo ?? undefined,
-          brillo: conRitmo ? ritmo.instrumentos[0] : 0,
         }
       : undefined;
 

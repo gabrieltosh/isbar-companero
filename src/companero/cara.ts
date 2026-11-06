@@ -95,8 +95,6 @@ export interface MusicaPose {
   cuernos?: number;
   /** Género principal de la canción (Jev), si se sabe: en las de fiesta salen estrellas */
   estilo?: string;
-  /** Golpe del bombo (1 → 0): el brillo de la cara late con él */
-  brillo?: number;
 }
 
 /** Lo que no depende de la expresión: hacia dónde mira, parpadeo, cabeza y saltitos. */
@@ -387,23 +385,20 @@ function contorno(w: number, arriba: number, abajo: number): string {
 }
 
 /** Forma rellena con trazo grueso y brillo (el trazo hace que una forma plana se vea como una línea). */
-/** Una pieza de la cara (ojo o boca) con su brillo suave alrededor; `pulso` (0 a 1) lo aviva. */
-function forma(d: string, x: number, y: number, giro: number, c: string, pulso = 0): string {
+function forma(d: string, x: number, y: number, giro: number, c: string): string {
   const pieza = `<path d="${d}" fill="${c}" stroke="${c}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
-  const brillo = `<path d="${d}" fill="none" stroke="${c}" stroke-opacity="${n(0.2 + pulso * 0.22)}" stroke-width="${n(9 + pulso * 2)}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const brillo = `<path d="${d}" fill="none" stroke="${c}" stroke-opacity=".2" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>`;
   return `<g transform="translate(${n(x)} ${n(y)}) rotate(${n(giro)})">${brillo}${pieza}</g>`;
 }
 
 /** Dibuja ojos y boca a partir de los rasgos y la pose. */
 export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
   const cierre = limitar(p.parpadeo, 0, 1) * 0.9;
-  // Con música, el brillo de la cara late con el bombo
-  const pulso = limitar(p.musica?.brillo ?? 0, 0, 1);
   const parpadear = (o: Ojo): Ojo => ({ ...o, t: o.t + (Math.min(o.t, 0.6) - o.t) * cierre, b: o.b + (Math.min(o.b, 0.6) - o.b) * cierre });
   const pintarOjo = (o: Ojo, base: { x: number; y: number }) => {
     const q = parpadear(o);
     // Las curvas: hacia arriba la de arriba (negativa en SVG), hacia abajo la de abajo
-    return forma(contorno(q.w, -q.t, q.b), base.x + q.dx + p.miraX, base.y + q.dy + p.miraY + p.salto, q.giro, c, pulso);
+    return forma(contorno(q.w, -q.t, q.b), base.x + q.dx + p.miraX, base.y + q.dy + p.miraY + p.salto, q.giro, c);
   };
   const bo = r.boca;
   const boca = forma(
@@ -412,7 +407,6 @@ export function dibujarCara(r: Rasgos, p: Pose, c: string): string {
     BOCA.y + bo.dy + p.miraY * 0.4 + p.salto,
     bo.giro,
     c,
-    pulso,
   );
   return `<g transform="rotate(${n(p.giro)} 32 32)">${pintarOjo(r.izq, OJO_IZQ)}${pintarOjo(r.der, OJO_DER)}${boca}</g>`;
 }
